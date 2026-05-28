@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@boccdotdev/data-reveal — demo</title>
+
+    <!-- gsap (+ plugins) resolved from a CDN so the demo needs no install.
+         These map the bare specifiers the package imports. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "gsap": "https://esm.sh/gsap@3.13.0",
+          "gsap/ScrollTrigger": "https://esm.sh/gsap@3.13.0/ScrollTrigger",
+          "gsap/SplitText": "https://esm.sh/gsap@3.13.0/SplitText"
+        }
+      }
+    </script>
+
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #111;
+        --bg: #fafafa;
+        --card: #fff;
+        --accent: #4f46e5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --fg: #eee; --bg: #0e0e10; --card: #1a1a1f; }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 16px/1.6 system-ui, sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      header {
+        min-height: 70vh;
+        display: grid;
+        place-content: center;
+        text-align: center;
+        padding: 2rem;
+        gap: 0.5rem;
+      }
+      header h1 { font-size: clamp(2rem, 6vw, 4rem); margin: 0; }
+      header p { opacity: 0.7; margin: 0; }
+      main { max-width: 720px; margin: 0 auto; padding: 0 1.5rem 30vh; }
+      section {
+        min-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 1rem;
+        border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+        padding: 4rem 0;
+      }
+      .tag {
+        font: 600 0.75rem/1 ui-monospace, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .card {
+        background: var(--card);
+        border-radius: 14px;
+        padding: 2rem;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+      }
+      h2 { font-size: clamp(1.6rem, 4vw, 2.6rem); margin: 0; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+      .grid > div {
+        background: var(--accent);
+        color: #fff;
+        border-radius: 10px;
+        aspect-ratio: 1;
+        display: grid;
+        place-content: center;
+        font-weight: 600;
+      }
+      .stat { font-size: clamp(2.5rem, 8vw, 5rem); font-weight: 800; color: var(--accent); }
+      .parallax-box {
+        background: linear-gradient(135deg, var(--accent), #ec4899);
+        color: #fff;
+        border-radius: 14px;
+        padding: 3rem;
+        font-weight: 700;
+        text-align: center;
+      }
+      img.demo-img {
+        width: 100%;
+        border-radius: 14px;
+        display: block;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        background: #ddd;
+      }
+      footer { text-align: center; padding: 4rem 1rem 8rem; opacity: 0.6; }
+      .note {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        background: var(--card);
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font: 0.75rem/1.4 ui-monospace, monospace;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        opacity: 0.85;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 data-reveal="split" data-reveal-split="chars">data-reveal</h1>
+      <p data-reveal="fade" data-reveal-delay="0.3">scroll down to see each type</p>
+    </header>
+
+    <main>
+      <section>
+        <span class="tag">fade</span>
+        <div class="card" data-reveal="fade" data-reveal-direction="up">
+          <h2>Fade up</h2>
+        </div>
+        <div class="card" data-reveal="fade" data-reveal-direction="left">
+          <h2>Fade from left</h2>
+        </div>
+      </section>
+
+      <section>
+        <span class="tag">scale — reverse on scroll up</span>
+        <div class="card" data-reveal="scale" data-reveal-from="0.8" data-reveal-reverse>
+          <h2>Scale in (and back out)</h2>
+        </div>
+      </section>
+
+      <section>
+        <span class="tag">split — words</span>
+        <h2 data-reveal="split" data-reveal-split="words">
+          Each word arrives on its own staggered beat
+        </h2>
+      </section>
+
+      <section>
+        <span class="tag">batch</span>
+        <div class="grid" data-reveal="batch" data-reveal-stagger="0.08">
+          <div data-reveal-item>1</div>
+          <div data-reveal-item>2</div>
+          <div data-reveal-item>3</div>
+          <div data-reveal-item>4</div>
+          <div data-reveal-item>5</div>
+          <div data-reveal-item>6</div>
+        </div>
+      </section>
+
+      <section>
+        <span class="tag">blur</span>
+        <div class="card" data-reveal="blur" data-reveal-blur="16">
+          <h2>Sharpen from blur</h2>
+        </div>
+      </section>
+
+      <section>
+        <span class="tag">clip — wipe right</span>
+        <div class="card" data-reveal="clip" data-reveal-direction="right">
+          <h2>Clip-path wipe</h2>
+        </div>
+      </section>
+
+      <section>
+        <span class="tag">rotate — axis y</span>
+        <div class="card" data-reveal="rotate" data-reveal-axis="y">
+          <h2>3D rotate in</h2>
+        </div>
+      </section>
+
+      <section>
+        <span class="tag">slide — from right</span>
+        <div class="card" data-reveal="slide" data-reveal-direction="right">
+          <h2>Slide in</h2>
+        </div>
+      </section>
+
+      <section>
+        <span class="tag">counter</span>
+        <div class="stat" data-reveal="counter" data-reveal-to="12480" data-reveal-separator=",">0</div>
+        <div class="stat" data-reveal="counter" data-reveal-to="98.6" data-reveal-decimals="1" data-reveal-suffix="%">0</div>
+      </section>
+
+      <section>
+        <span class="tag">parallax</span>
+        <div class="parallax-box" data-reveal="parallax" data-reveal-speed="0.4">
+          I drift as you scroll
+        </div>
+      </section>
+    </main>
+
+    <footer>end of demo</footer>
+    <div class="note">prefers-reduced-motion respected</div>
+
+    <script type="module">
+      import { createReveal } from "../dist/index.js";
+      const reveal = createReveal();
+      reveal.init();
+    </script>
+  </body>
+</html>

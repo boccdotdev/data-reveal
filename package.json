@@ -1,0 +1,47 @@
+{
+  "name": "@boccdotdev/data-reveal",
+  "version": "0.1.0",
+  "description": "Declarative, scroll-triggered reveal animations driven by data attributes. GSAP-powered, code-split so each animation type loads only when present on the page.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "gsap",
+    "scrolltrigger",
+    "animation",
+    "reveal",
+    "scroll",
+    "data-attributes",
+    "declarative"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boccdotdev/data-reveal.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "gsap": ">=3.13.0"
+  },
+  "devDependencies": {
+    "gsap": "^3.13.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  }
+}
