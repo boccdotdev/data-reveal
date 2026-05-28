@@ -20,7 +20,7 @@ export const init: RevealInit = (el, { reduced }) => {
   const delay = num(el.dataset.revealDelay, 0);
 
   const split = SplitText.create(el, { type: splitType });
-  registry.addSplit(split);
+  registry.addSplit(el, split);
 
   const targets = split[splitType];
   gsap.set(el, { opacity: 1 });
@@ -36,5 +36,5 @@ export const init: RevealInit = (el, { reduced }) => {
     scrollTrigger: revealTrigger(el),
   });
 
-  registry.track(tween);
+  registry.track(el, tween);
 };

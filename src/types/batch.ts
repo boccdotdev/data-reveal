@@ -53,5 +53,5 @@ export const init: RevealInit = (el, { reduced }) => {
       : undefined,
   });
 
-  triggers.forEach((t) => registry.add(t));
+  triggers.forEach((t) => registry.add(el, t));
 };

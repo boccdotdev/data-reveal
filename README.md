@@ -45,10 +45,21 @@ const reveal = createReveal();
 await reveal.init();              // scan document
 await reveal.init(myContainer);   // scan a subtree only (any ParentNode)
 
-reveal.destroy();                 // kill all tweens + ScrollTriggers, revert SplitText
+reveal.refresh();                 // recompute all ScrollTrigger positions
+
+reveal.destroy();                 // kill everything, revert SplitText, forget all elements
+reveal.destroy(myContainer);      // kill + forget only reveals on/inside myContainer
 ```
 
-`init()` is idempotent — already-initialized elements are skipped, so you can safely call it again as new content is added (e.g. infinite scroll). Call `destroy()` on SPA route changes to tear everything down.
+`init()` is idempotent — already-initialized elements are skipped, so you can safely call it again as new content is added (e.g. infinite scroll).
+
+### `refresh()`
+
+Recomputes every ScrollTrigger's start/end positions. ScrollTrigger already refreshes on window resize and load, but a **JavaScript-driven layout change doesn't fire that** — so call `refresh()` after toggling a grid's column count, opening an accordion, or when fonts/images finish loading and shift the page. Calls are coalesced to one refresh per frame, so it's cheap to call repeatedly.
+
+### `destroy(container?)`
+
+With no argument, kills all tweens + ScrollTriggers, reverts SplitText, and forgets every element — a later `init()` re-runs the whole page. Pass a `container` to tear down only the reveals on or inside it; those elements are forgotten too, so re-adding content there and calling `init()` re-animates just that subtree. `contains` works on detached nodes, so you can pass a subtree you're about to remove. Use the scoped form for SPA partial swaps, the bare form for a full route change.
 
 ## Animation types
 

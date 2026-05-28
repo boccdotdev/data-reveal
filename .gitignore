@@ -20,3 +20,6 @@ yarn-error.log*
 
 # Test tooling
 .playwright-mcp/
+
+# Agent files
+CLAUDE.md

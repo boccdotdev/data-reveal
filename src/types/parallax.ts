@@ -27,5 +27,5 @@ export const init: RevealInit = (el, { reduced }) => {
     },
   );
 
-  registry.track(tween);
+  registry.track(el, tween);
 };

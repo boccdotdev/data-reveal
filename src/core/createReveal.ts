@@ -38,14 +38,26 @@ export interface RevealInstance {
    * types in use, and run them. Async because type modules load on demand.
    */
   init(container?: ParentNode): Promise<void>;
-  /** Kill all tweens, ScrollTriggers, and revert SplitText instances. */
-  destroy(): void;
+  /**
+   * Recompute every ScrollTrigger's start/end positions. Call after a layout
+   * change that ScrollTrigger can't detect on its own (e.g. toggling a grid's
+   * column count, an accordion opening, late-loading fonts/images). Coalesced
+   * to one refresh per frame.
+   */
+  refresh(): void;
+  /**
+   * Tear down reveals. With no argument, kills everything and forgets all
+   * elements so a later `init()` re-runs the whole page. With a container,
+   * kills only reveals on or inside it and forgets just those elements, so
+   * re-adding content there and calling `init()` re-animates it.
+   */
+  destroy(container?: ParentNode): void;
 }
 
 export function createReveal(): RevealInstance {
   // Elements already initialized, so init() is safe to call repeatedly as the
   // DOM grows (e.g. infinite scroll) without re-animating existing elements.
-  const seen = new WeakSet<Element>();
+  let seen = new WeakSet<Element>();
 
   return {
     async init(container: ParentNode = document): Promise<void> {
@@ -82,8 +94,22 @@ export function createReveal(): RevealInstance {
       scheduleRefresh();
     },
 
-    destroy(): void {
-      registry.killAll();
+    refresh(): void {
+      scheduleRefresh();
+    },
+
+    destroy(container?: ParentNode): void {
+      if (!container) {
+        registry.killAll();
+        seen = new WeakSet();
+        return;
+      }
+      // Forget every matching element so init() can re-animate it later.
+      container.querySelectorAll<HTMLElement>("[data-reveal]").forEach((el) => seen.delete(el));
+      if (container instanceof Element && container.matches("[data-reveal]")) {
+        seen.delete(container);
+      }
+      registry.kill(container);
     },
   };
 }

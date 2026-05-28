@@ -43,5 +43,5 @@ export const init: RevealInit = (el, { reduced }) => {
     scrollTrigger: revealTrigger(el),
   });
 
-  registry.track(tween);
+  registry.track(el, tween);
 };
