@@ -3,7 +3,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { num } from "../internal/attrs.js";
 import { revealTrigger } from "../internal/trigger.js";
-import type { RevealInit, Direction } from "../internal/types.js";
+import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -38,3 +38,5 @@ export const init: RevealInit = (el, { reduced }) => {
 
   registry.track(el, tween);
 };
+
+export const clip: RevealRegistration = { type: "clip", init };

@@ -198,8 +198,26 @@
     <div class="note">prefers-reduced-motion respected</div>
 
     <script type="module">
-      import { createReveal } from "../dist/index.js";
-      const reveal = createReveal();
+      // Manual registration: each type is imported from its own subpath and
+      // passed to createReveal, so a real build would bundle only these. This
+      // demo exercises every type, so it registers all of them. For zero-config
+      // auto-loading instead, import { createReveal } from "../dist/index.js"
+      // and just call init() — no registration needed.
+      import { createReveal } from "../dist/manual.js";
+      import { fade } from "../dist/types/fade.js";
+      import { scale } from "../dist/types/scale.js";
+      import { split } from "../dist/types/split.js";
+      import { batch } from "../dist/types/batch.js";
+      import { blur } from "../dist/types/blur.js";
+      import { clip } from "../dist/types/clip.js";
+      import { rotate } from "../dist/types/rotate.js";
+      import { slide } from "../dist/types/slide.js";
+      import { counter } from "../dist/types/counter.js";
+      import { parallax } from "../dist/types/parallax.js";
+
+      const reveal = createReveal({
+        types: [fade, scale, split, batch, blur, clip, rotate, slide, counter, parallax],
+      });
       reveal.init();
     </script>
   </body>

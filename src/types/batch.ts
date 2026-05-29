@@ -3,7 +3,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { num } from "../internal/attrs.js";
 import { isReverse, revealStart } from "../internal/trigger.js";
-import type { RevealInit } from "../internal/types.js";
+import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -55,3 +55,5 @@ export const init: RevealInit = (el, { reduced }) => {
 
   triggers.forEach((t) => registry.add(el, t));
 };
+
+export const batch: RevealRegistration = { type: "batch", init };
