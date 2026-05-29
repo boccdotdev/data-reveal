@@ -37,6 +37,25 @@ That's it. Add a `data-reveal` attribute to any element and it animates as it sc
 
 Because loading is dynamic, `init()` is **async**. `await` it (or `.then()`) if you need to run code after reveals are set up.
 
+## Minimal builds (manual registration)
+
+Auto mode is convenient, but to dynamically load any type on demand it has to *reference* every type — so your bundler emits a chunk file for all of them, even ones your site never uses. They're never downloaded unless present on a page, but the files still sit in your build output.
+
+If you want only the types you use to exist in your build at all, import the **`/manual`** entry and register types explicitly. It has no reference to the auto-loader, so unused type modules (and their GSAP plugins) are never bundled:
+
+```ts
+import { createReveal } from "@boccdotdev/data-reveal/manual";
+import { fade } from "@boccdotdev/data-reveal/fade";
+import { scale } from "@boccdotdev/data-reveal/scale";
+
+const reveal = createReveal({ types: [fade, scale] });
+await reveal.init();
+```
+
+Each type is importable from its own subpath: `@boccdotdev/data-reveal/{fade,scale,split,batch,blur,clip,rotate,slide,counter,parallax}`. The HTML API is identical — `data-reveal="fade"` still works; you've just told the bundler which types are in play. A `data-reveal` type you didn't register is silently skipped.
+
+The returned instance is the same as auto mode — `init`, `refresh`, `destroy` all behave identically. Choose auto for zero-config convenience, manual when build size matters.
+
 ## API
 
 ```ts

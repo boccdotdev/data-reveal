@@ -7,6 +7,50 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./manual": {
+      "types": "./dist/manual.d.ts",
+      "import": "./dist/manual.js"
+    },
+    "./batch": {
+      "types": "./dist/types/batch.d.ts",
+      "import": "./dist/types/batch.js"
+    },
+    "./blur": {
+      "types": "./dist/types/blur.d.ts",
+      "import": "./dist/types/blur.js"
+    },
+    "./clip": {
+      "types": "./dist/types/clip.d.ts",
+      "import": "./dist/types/clip.js"
+    },
+    "./counter": {
+      "types": "./dist/types/counter.d.ts",
+      "import": "./dist/types/counter.js"
+    },
+    "./fade": {
+      "types": "./dist/types/fade.d.ts",
+      "import": "./dist/types/fade.js"
+    },
+    "./parallax": {
+      "types": "./dist/types/parallax.d.ts",
+      "import": "./dist/types/parallax.js"
+    },
+    "./rotate": {
+      "types": "./dist/types/rotate.d.ts",
+      "import": "./dist/types/rotate.js"
+    },
+    "./scale": {
+      "types": "./dist/types/scale.d.ts",
+      "import": "./dist/types/scale.js"
+    },
+    "./slide": {
+      "types": "./dist/types/slide.d.ts",
+      "import": "./dist/types/slide.js"
+    },
+    "./split": {
+      "types": "./dist/types/split.d.ts",
+      "import": "./dist/types/split.js"
     }
   },
   "files": [

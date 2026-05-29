@@ -4,7 +4,7 @@ import { SplitText } from "gsap/SplitText";
 import { registry } from "../core/registry.js";
 import { num } from "../internal/attrs.js";
 import { revealTrigger } from "../internal/trigger.js";
-import type { RevealInit, SplitType } from "../internal/types.js";
+import type { RevealInit, SplitType, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
@@ -38,3 +38,5 @@ export const init: RevealInit = (el, { reduced }) => {
 
   registry.track(el, tween);
 };
+
+export const split: RevealRegistration = { type: "split", init };
