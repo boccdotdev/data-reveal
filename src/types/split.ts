@@ -19,7 +19,10 @@ export const init: RevealInit = (el, { reduced }) => {
   const duration = num(el.dataset.revealDuration, 0.5);
   const delay = num(el.dataset.revealDelay, 0);
 
-  const split = SplitText.create(el, { type: splitType });
+  // Splitting words alongside chars wraps each char in an inline-block word,
+  // so a word wraps as a unit instead of breaking between letters.
+  const gsapType = splitType === "chars" ? "words, chars" : splitType;
+  const split = SplitText.create(el, { type: gsapType });
   registry.addSplit(el, split);
 
   const targets = split[splitType];
