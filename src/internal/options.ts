@@ -29,6 +29,7 @@ const kinds: Record<Key, "number" | "amount" | "string" | "text" | "flag"> = {
   prefix: "text",
   suffix: "text",
   reverse: "flag",
+  keep: "flag",
 };
 
 /** One option's value, or undefined if it's unset or can't be read. */

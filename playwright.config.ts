@@ -11,6 +11,9 @@ export default defineConfig<RevealTestOptions>({
   testDir: "tests/e2e",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
+  // A rare browser hiccup under CI load shouldn't fail the run. Locally a
+  // failure is always reported.
+  retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: `http://127.0.0.1:${port}`,

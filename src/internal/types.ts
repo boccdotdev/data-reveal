@@ -52,6 +52,11 @@ export interface RevealOptions {
   suffix?: string;
   /** Play out again when scrolling back up past `start`. `parallax` always does. */
   reverse?: boolean;
+  /**
+   * Keep the end state inline once a play-once reveal finishes. By default
+   * the props it animated go back to the element's own CSS.
+   */
+  keep?: boolean;
 }
 
 /** Options per type, applied over `defaults`. */
@@ -62,7 +67,8 @@ export interface RevealDefaults {
   /**
    * Options for every type, except where an option means something else to
    * a type: `parallax` ignores `start` and `end` here, `counter` ignores
-   * `duration`, and `split` ignores `stagger`. Set those in `typeDefaults`.
+   * `duration`, `from` and `ease`, `scale` ignores `from`, and `split`
+   * ignores `stagger`. Set those in `typeDefaults`.
    */
   defaults?: RevealOptions;
   /** Options per type, over `defaults`. Type-specific options like `from` belong here. */

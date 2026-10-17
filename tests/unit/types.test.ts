@@ -1,5 +1,6 @@
 import type { ScrollTrigger } from "gsap/ScrollTrigger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { registry } from "../../src/core/registry";
 import { defaultStart } from "../../src/internal/trigger";
 import type { RevealContext, RevealInit } from "../../src/internal/types";
 import { init as batch } from "../../src/types/batch";
@@ -17,15 +18,25 @@ import { html } from "./helpers";
 type Vars = Record<string, unknown> & { scrollTrigger?: { start?: unknown } };
 
 // GSAP stand-ins that record the tweens and triggers each type asks for.
+// `own` is the transform getProperty() reports, as if from the element's CSS.
 const recorded = vi.hoisted(() => ({
   to: [] as Array<Record<string, unknown>>,
   fromTo: [] as Array<Record<string, unknown>>,
   batch: [] as Array<Record<string, unknown>>,
+  set: [] as Array<Record<string, unknown>>,
+  own: {} as Record<string, number>,
+  // The tweens getTweensOf() reports as running on a target.
+  active: [] as unknown[],
 }));
 vi.mock("gsap", () => ({
   gsap: {
     registerPlugin: () => {},
-    set: () => {},
+    set: (_target: unknown, vars: Record<string, unknown>) => {
+      recorded.set.push(vars);
+    },
+    getTweensOf: () => recorded.active,
+    getProperty: (_target: unknown, property: string) =>
+      recorded.own[property] ?? (property.startsWith("scale") ? 1 : 0),
     to: (_target: unknown, vars: Record<string, unknown>) => {
       recorded.to.push(vars);
       return { kill: () => {} };
@@ -52,6 +63,9 @@ beforeEach(() => {
   recorded.to.length = 0;
   recorded.fromTo.length = 0;
   recorded.batch.length = 0;
+  recorded.set.length = 0;
+  recorded.own = {};
+  recorded.active = [];
   document.body.innerHTML = "";
 });
 
@@ -99,6 +113,126 @@ describe.each(builtInEases)("%s", (_name, init, builtInEase) => {
   });
 });
 
+// Play-once types, which hand the props they animated back when they finish.
+const oneShot = builtInEases.filter(([name]) => name !== "split" && name !== "counter");
+
+describe.each(oneShot)("%s when it finishes", (_name, init) => {
+  it("hands the animated props back to the element's own CSS", () => {
+    const target = element('style="color: red;"');
+    // As the core does before a type's init.
+    registry.snapshot(target, target);
+    init(target, { reduced: false, defaults: {} });
+    const vars = recorded.to[recorded.to.length - 1];
+    // Stand in for the end state GSAP leaves inline.
+    Object.assign(target.style, {
+      opacity: "1",
+      transform: "translate(0px, 0px)",
+      clipPath: "inset(0px)",
+      filter: "blur(0px)",
+    });
+
+    const tween = {};
+    recorded.active = [tween];
+    (vars.onComplete as (this: unknown) => void).call(tween);
+    expect(target.style.cssText).toBe("color: red;");
+  });
+
+  it("leaves them while another reveal is still animating the element", () => {
+    const target = element('style="color: red;"');
+    registry.snapshot(target, target);
+    init(target, { reduced: false, defaults: {} });
+    const vars = recorded.to[recorded.to.length - 1];
+    target.style.transform = "translate(0px, 20px)";
+
+    const tween = {};
+    recorded.active = [tween, { another: "tween" }];
+    (vars.onComplete as (this: unknown) => void).call(tween);
+    expect(target.style.transform).toBe("translate(0px, 20px)");
+  });
+
+  it("animates to the element's own opacity, so handing it back doesn't jump", () => {
+    document.head.innerHTML = `<style>.muted { opacity: 0.6; }</style>`;
+    const vars = run(init, 'class="muted"');
+    document.head.innerHTML = "";
+    // clip doesn't animate opacity at all.
+    if ("opacity" in vars) expect(vars.opacity).toBe(0.6);
+  });
+
+  it("keeps its end state with reverse or keep", () => {
+    expect(run(init, "data-reveal-reverse").onComplete).toBeUndefined();
+    expect(run(init, "data-reveal-keep").onComplete).toBeUndefined();
+    expect(run(init, "", { keep: true }).onComplete).toBeUndefined();
+  });
+});
+
+describe("counter", () => {
+  it("leaves its own text on destroy() when that already shows the target", () => {
+    const target = element();
+    registry.snapshot(target, target);
+    counter(target, { reduced: false, defaults: {} });
+    expect(target.textContent).toBe("0");
+
+    registry.killElement(target, { restore: "animated" });
+    expect(target.textContent).toBe("12");
+  });
+
+  it("leaves the formatted target on destroy() in place of a placeholder", () => {
+    html(`<div id="target" data-reveal-to="1200" data-reveal-separator=",">0</div>`);
+    const target = document.getElementById("target") as HTMLElement;
+    registry.snapshot(target, target);
+    counter(target, { reduced: false, defaults: {} });
+
+    registry.killElement(target, { restore: "animated" });
+    expect(target.textContent).toBe("1,200");
+  });
+});
+
+describe("a transform of the element's own", () => {
+  const lastSet = () => recorded.set[recorded.set.length - 1];
+  const lastTo = () => recorded.to[recorded.to.length - 1];
+
+  it("fade starts at its own position plus the offset and ends on it", () => {
+    recorded.own = { x: 10, y: -30 };
+    run(fade);
+    expect(lastSet()).toMatchObject({ x: 10, y: -10 });
+    expect(lastTo()).toMatchObject({ x: 10, y: -30 });
+  });
+
+  it("slide starts its own percentage plus a box away and ends on it", () => {
+    recorded.own = { xPercent: -50 };
+    run(slide, 'data-reveal-direction="left"');
+    expect(lastSet()).toMatchObject({ xPercent: 50, yPercent: 0 });
+    expect(lastTo()).toMatchObject({ xPercent: -50, yPercent: 0 });
+  });
+
+  it("scale starts at `from` times its own scale and ends on it", () => {
+    recorded.own = { scaleX: 1.2, scaleY: 1.2 };
+    run(scale, 'data-reveal-from="0.5"');
+    expect(lastSet()).toMatchObject({ scaleX: 0.6, scaleY: 0.6 });
+    expect(lastTo()).toMatchObject({ scaleX: 1.2, scaleY: 1.2 });
+  });
+
+  it("rotate turns from its own angle plus `rotate` back to its own", () => {
+    recorded.own = { rotation: 8 };
+    run(rotate, 'data-reveal-axis="z"');
+    expect(lastSet()).toMatchObject({ rotation: 98 });
+    expect(lastTo()).toMatchObject({ rotation: 8 });
+  });
+
+  it("batch moves each item from its own y plus the distance to its own y", () => {
+    recorded.own = { y: -30 };
+    html(`<ul id="list"><li id="item">one</li></ul>`);
+    const item = document.getElementById("item") as HTMLElement;
+    batch(document.getElementById("list") as HTMLElement, { reduced: false, defaults: {} });
+    const hidden = lastSet() as { y: (index: number, target: Element) => number };
+    expect(hidden.y(0, item)).toBe(-10);
+
+    const vars = recorded.batch[recorded.batch.length - 1] as Vars;
+    (vars.onEnter as (group: Element[]) => void)([item]);
+    expect((lastTo() as { y: (index: number, target: Element) => number }).y(0, item)).toBe(-30);
+  });
+});
+
 describe("batch", () => {
   function batchVars(attributes = "", defaults: RevealContext["defaults"] = {}): Vars {
     html(`<ul id="list" ${attributes}><li>one</li></ul>`);
@@ -121,6 +255,41 @@ describe("batch", () => {
     const vars = batchVars('data-reveal-reverse data-reveal-ease="none"', { ease: "power4.in" });
     expect(easeOf(vars.onEnter)).toBe("none");
     expect(easeOf(vars.onLeaveBack)).toBe("none");
+  });
+
+  it("hands each item's animated props back when that item finishes", () => {
+    const vars = batchVars();
+    const item = document.querySelector("li") as HTMLElement;
+    (vars.onEnter as (group: Element[]) => void)([item]);
+    const tween = recorded.to[recorded.to.length - 1] as { stagger: { onComplete: (this: unknown) => void } };
+    Object.assign(item.style, { opacity: "1", transform: "translate(0px, 0px)" });
+
+    const itemTween = { targets: () => [item] };
+    recorded.active = [itemTween];
+    tween.stagger.onComplete.call(itemTween);
+    expect(item.hasAttribute("style")).toBe(false);
+  });
+
+  it("animates each item to its own opacity", () => {
+    document.head.innerHTML = `<style>.muted { opacity: 0.6; }</style>`;
+    html(`<ul id="list"><li id="plain">one</li><li id="muted" class="muted">two</li></ul>`);
+    batch(document.getElementById("list") as HTMLElement, { reduced: false, defaults: {} });
+    document.head.innerHTML = "";
+    const vars = recorded.batch[recorded.batch.length - 1] as Vars;
+    (vars.onEnter as (group: Element[]) => void)([]);
+    const opacity = recorded.to[recorded.to.length - 1].opacity as (index: number, item: Element) => number;
+
+    expect(opacity(0, document.getElementById("plain") as Element)).toBe(1);
+    expect(opacity(1, document.getElementById("muted") as Element)).toBe(0.6);
+  });
+
+  it("keeps the items' end state with reverse or keep", () => {
+    const staggerOf = (vars: Vars) => {
+      (vars.onEnter as (group: Element[]) => void)([]);
+      return recorded.to[recorded.to.length - 1].stagger;
+    };
+    expect(staggerOf(batchVars("data-reveal-reverse"))).toBe(0.06);
+    expect(staggerOf(batchVars("data-reveal-keep"))).toBe(0.06);
   });
 
   it("uses the built-in start unless one is set", () => {
@@ -170,9 +339,10 @@ describe("the built-in start", () => {
 
   function innerScroller(scrollHeight: number): HTMLElement {
     const scroller = document.createElement("div");
-    // 300px down the window, 420px tall: its 85% line is 357px in, or 657px in the window.
+    // 300px down the window with a 40px top border, then 380px to scroll in:
+    // its 85% line is 323px in, or 663px in the window.
     scroller.getBoundingClientRect = () => ({ top: 300 }) as DOMRect;
-    stub(scroller, { clientTop: 0, clientHeight: 420, scrollTop: 0, scrollHeight });
+    stub(scroller, { clientTop: 40, clientHeight: 380, scrollTop: 0, scrollHeight });
     return scroller;
   }
 
@@ -192,9 +362,10 @@ describe("the built-in start", () => {
   });
 
   it("measures against an element scroller, not the window", () => {
-    // 335px into the scroller: above its line, though below the window's.
-    expect(startFor(635, innerScroller(2000))).toBe("top 85%");
+    // 303px into the scroller: above its line, though below the window's, and
+    // below its line if the border were counted as scroll space.
+    expect(startFor(643, innerScroller(2000))).toBe("top 85%");
     expect(startFor(700, innerScroller(2000))).toBe("clamp(top 85%)");
-    expect(startFor(700, innerScroller(420))).toBe("top bottom");
+    expect(startFor(700, innerScroller(380))).toBe("top bottom");
   });
 });

@@ -29,7 +29,7 @@ export function createReveal({ types, defaults, typeDefaults }: CreateRevealOpti
   return createRevealCore((type) => map.get(type) ?? null, { defaults, typeDefaults });
 }
 
-export type { RevealInstance } from "./core/createRevealCore.js";
+export type { RevealInstance, RevealDestroyOptions } from "./core/createRevealCore.js";
 export type {
   RevealRegistration,
   RevealType,

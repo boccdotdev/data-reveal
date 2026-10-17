@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RevealDefaults, RevealInit } from "../../src/internal/types";
 import { deferred, el, fakeType, html, loadCore, settle, state } from "./helpers";
 
-const scrollTrigger = { refresh: vi.fn(), fail: false };
+const scrollTrigger = { refresh: vi.fn(), triggers: 1, fail: false };
 
 // Frames queue up here instead of running, so a refresh one test schedules
 // can't land in another, and a test runs them when it's ready.
@@ -15,11 +15,14 @@ function runFrames(): void {
 
 beforeEach(() => {
   scrollTrigger.refresh.mockClear();
+  scrollTrigger.triggers = 1;
   scrollTrigger.fail = false;
   // Registered per test, so a module one test loaded isn't reused by the next.
   vi.doMock("gsap/ScrollTrigger", () => {
     if (scrollTrigger.fail) throw new Error("ScrollTrigger chunk is gone");
-    return { ScrollTrigger: { refresh: scrollTrigger.refresh } };
+    return {
+      ScrollTrigger: { refresh: scrollTrigger.refresh, getAll: () => Array(scrollTrigger.triggers).fill({}) },
+    };
   });
   frames = [];
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
@@ -27,7 +30,11 @@ beforeEach(() => {
   document.body.innerHTML = "";
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Let a refresh this test scheduled reach requestAnimationFrame now, so it
+  // lands in this test's queue rather than the next one's.
+  await import("gsap/ScrollTrigger").catch(() => {});
+  await settle();
   vi.unstubAllGlobals();
 });
 
@@ -188,7 +195,7 @@ describe("init()", () => {
   });
 
   describe("global defaults a type would misread", () => {
-    const global = { start: "top 75%", end: "bottom 50%", duration: 0.35, stagger: 0.08 };
+    const global = { start: "top 75%", end: "bottom 50%", duration: 0.35, stagger: 0.08, from: 100, ease: "back.out(2)" };
 
     async function defaultsByType(typeDefaults?: RevealDefaults["typeDefaults"]) {
       const { createRevealCore } = await loadCore();
@@ -198,28 +205,34 @@ describe("init()", () => {
         <div id="fade" data-reveal="fade"></div>
         <div id="parallax" data-reveal="parallax"></div>
         <div id="counter" data-reveal="counter"></div>
+        <div id="scale" data-reveal="scale"></div>
         <h2 id="split" data-reveal="split"></h2>
       `);
       await reveal.init();
       return (id: string) => init.mock.calls.find(([target]) => target.id === id)?.[1].defaults;
     }
 
-    it("are left out: start and end for parallax, duration for counter, stagger for split", async () => {
+    it("are left out: start and end for parallax, duration, from and ease for counter, from for scale, stagger for split", async () => {
       const defaultsOf = await defaultsByType();
+      const without = (...keys: string[]) =>
+        Object.fromEntries(Object.entries(global).filter(([key]) => !keys.includes(key)));
       expect(defaultsOf("fade")).toEqual(global);
-      expect(defaultsOf("parallax")).toEqual({ duration: 0.35, stagger: 0.08 });
-      expect(defaultsOf("counter")).toEqual({ start: "top 75%", end: "bottom 50%", stagger: 0.08 });
-      expect(defaultsOf("split")).toEqual({ start: "top 75%", end: "bottom 50%", duration: 0.35 });
+      expect(defaultsOf("parallax")).toEqual(without("start", "end"));
+      expect(defaultsOf("counter")).toEqual(without("duration", "from", "ease"));
+      expect(defaultsOf("scale")).toEqual(without("from"));
+      expect(defaultsOf("split")).toEqual(without("stagger"));
     });
 
     it("still apply from typeDefaults", async () => {
       const defaultsOf = await defaultsByType({
         parallax: { start: "top 90%", end: "bottom 10%" },
-        counter: { duration: 2 },
+        counter: { duration: 2, from: 5, ease: "none" },
+        scale: { from: 0.5 },
         split: { stagger: 0.01 },
       });
       expect(defaultsOf("parallax")).toMatchObject({ start: "top 90%", end: "bottom 10%" });
-      expect(defaultsOf("counter")).toMatchObject({ duration: 2 });
+      expect(defaultsOf("counter")).toMatchObject({ duration: 2, from: 5, ease: "none" });
+      expect(defaultsOf("scale")).toMatchObject({ from: 0.5 });
       expect(defaultsOf("split")).toMatchObject({ stagger: 0.01 });
     });
   });
@@ -491,6 +504,61 @@ describe("destroy()", () => {
   });
 });
 
+describe("destroy() and what types left behind", () => {
+  // A stand-in type that sets a from-state inline, as the built-in ones do.
+  async function setup() {
+    const { createRevealCore, registry } = await loadCore();
+    const reveal = createRevealCore(() => (target) => {
+      target.style.opacity = "0";
+      target.style.transform = "translateY(20px)";
+      registry.add(target, { kill: () => {} });
+    });
+    html(`<section id="swap"><div id="a" data-reveal="fade" style="color: red;"></div></section>`);
+    await reveal.init();
+    return reveal;
+  }
+
+  it("puts elements back as they were before init() by default", async () => {
+    const reveal = await setup();
+    reveal.destroy();
+    expect(el("a").style.cssText).toBe("color: red;");
+    // Still marked as handled, so reveal.css doesn't hide it again.
+    expect(state("a")).toBe("ready");
+  });
+
+  it("keeps inline styles the site set since init()", async () => {
+    const reveal = await setup();
+    el("a").style.display = "none";
+    el("a").style.outline = "2px solid red";
+
+    reveal.destroy();
+    expect(el("a").style.display).toBe("none");
+    expect(el("a").style.outlineStyle).toBe("solid");
+    expect(el("a").style.opacity).toBe("");
+    expect(el("a").style.transform).toBe("");
+  });
+
+  it("does the same for a container", async () => {
+    const reveal = await setup();
+    reveal.destroy(el("swap"));
+    expect(el("a").style.cssText).toBe("color: red;");
+  });
+
+  it("leaves the inline styles with { revert: false }", async () => {
+    const reveal = await setup();
+    reveal.destroy(undefined, { revert: false });
+    expect(el("a").style.opacity).toBe("0");
+    expect(el("a").style.transform).toBe("translateY(20px)");
+  });
+
+  it("shows a reverted element that a site's own pre-hide would hide", async () => {
+    document.head.innerHTML = `<style>[data-reveal] { opacity: 0; }</style>`;
+    const reveal = await setup();
+    reveal.destroy(el("swap"));
+    expect(el("a").style.opacity).toBe("1");
+  });
+});
+
 describe("refresh", () => {
   it("is scheduled only once an element became ready", async () => {
     const { createRevealCore, registry } = await loadCore();
@@ -513,8 +581,20 @@ describe("refresh", () => {
     reveal.refresh();
     await vi.waitFor(() => expect(frames).toHaveLength(1));
     runFrames();
-    // Coalesced into one call per frame.
+    // Coalesced into one call per frame, in safe mode.
     expect(scrollTrigger.refresh).toHaveBeenCalledTimes(1);
+    expect(scrollTrigger.refresh).toHaveBeenCalledWith(true);
+  });
+
+  it("doesn't refresh while there are no triggers", async () => {
+    const { createRevealCore } = await loadCore();
+    const reveal = createRevealCore(() => null);
+    scrollTrigger.triggers = 0;
+
+    reveal.refresh();
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+    runFrames();
+    expect(scrollTrigger.refresh).not.toHaveBeenCalled();
   });
 
   it("survives ScrollTrigger failing to load, and works once it can", async () => {

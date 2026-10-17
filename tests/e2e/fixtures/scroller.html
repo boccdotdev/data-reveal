@@ -9,12 +9,19 @@
   <style>
     body { padding: 0; }
     header { height: 300px; background: #bbb; }
-    /* Fills the rest of the 720px viewport: 420px, with its 85% line at 357px. */
-    #scroller { height: calc(100vh - 300px); overflow: auto; }
+    /* Fills the rest of the 720px viewport. Its 40px top border leaves 380px
+       to scroll in, with an 85% line 323px into it. */
+    #scroller {
+      box-sizing: border-box;
+      height: calc(100vh - 300px);
+      overflow: auto;
+      border-top: 40px solid #888;
+    }
     /* With the box's 8px margin and fade's 20px starting offset, the element's
-       top sits 335px into the scroller: above the scroller's 85% line, but at
-       635px in the window, below the window's (612px). */
-    .above { height: 307px; }
+       top sits 303px into the scroller: above its 85% line, but not if the
+       border were counted (343px), and at 643px in the window, below the
+       window's line (612px). */
+    .above { height: 275px; }
     .below { height: 1500px; }
     /* The window scrolls too, so measuring against it gives a different answer. */
     footer { height: 600px; }

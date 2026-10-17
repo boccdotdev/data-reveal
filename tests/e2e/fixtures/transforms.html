@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Own transforms</title>
+  <style>
+    /* Each reveal sits next to a twin with the same CSS and no reveal, which
+       shows where the CSS puts it. */
+    .pair { display: flex; gap: 40px; }
+    .stage { position: relative; width: 400px; height: 120px; }
+    .stage > * { width: 200px; margin: 0; }
+    /* The same box whatever the label says. */
+    .stage * { box-sizing: border-box; height: 40px; white-space: nowrap; overflow: hidden; }
+    .twin { visibility: hidden; }
+    .centred { position: absolute; left: 50%; transform: translateX(-50%); }
+    .grown { scale: 1.2; }
+    .tilted { rotate: 8deg; }
+    .raised { translate: 0 -30px; }
+    /* Like Tailwind v4's translate-x-10, which sets the translate property. */
+    .tw-translate-x-10 { --tw-translate-x: 40px; --tw-translate-y: 0; translate: var(--tw-translate-x) var(--tw-translate-y); }
+  </style>
+</head>
+<body>
+  <p>Reveals on elements with transforms of their own, a screen apart.</p>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="slide" class="box centred" data-reveal="slide" data-reveal-duration="0.4">slide, translateX(-50%)</div></div>
+    <div class="stage"><div id="slide-twin" class="box centred twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="scale" class="box grown" data-reveal="scale" data-reveal-duration="0.4">scale, scale: 1.2</div></div>
+    <div class="stage"><div id="scale-twin" class="box grown twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="rotate" class="box tilted" data-reveal="rotate" data-reveal-axis="z" data-reveal-duration="0.4">rotate on z, rotate: 8deg</div></div>
+    <div class="stage"><div id="rotate-twin" class="box tilted twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="rotate-x" class="box tilted" data-reveal="rotate" data-reveal-duration="0.4">rotate on x, rotate: 8deg</div></div>
+    <div class="stage"><div id="rotate-x-twin" class="box tilted twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="fade" class="box raised" data-reveal="fade" data-reveal-duration="0.4">fade, translate: 0 -30px</div></div>
+    <div class="stage"><div id="fade-twin" class="box raised twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="tailwind" class="box tw-translate-x-10" data-reveal="fade" data-reveal-duration="0.4">fade, Tailwind translate</div></div>
+    <div class="stage"><div id="tailwind-twin" class="box tw-translate-x-10 twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage">
+      <ul id="batch" data-reveal="batch" data-reveal-duration="0.4" data-reveal-stagger="0">
+        <li id="batch-item" class="raised" data-reveal-item>batch item, translate: 0 -30px</li>
+      </ul>
+    </div>
+    <div class="stage"><ul><li id="batch-item-twin" class="raised twin">twin</li></ul></div>
+  </div>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

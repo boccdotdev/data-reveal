@@ -116,8 +116,9 @@ await reveal.init(myContainer);   // scan a subtree only (any ParentNode), inclu
 
 reveal.refresh();                 // recompute all ScrollTrigger positions
 
-reveal.destroy();                 // kill everything, revert SplitText, forget all elements
-reveal.destroy(myContainer);      // kill + forget only reveals on/inside myContainer
+reveal.destroy();                 // kill everything, put elements back, forget them
+reveal.destroy(myContainer);      // the same, only for reveals on/inside myContainer
+reveal.destroy(myContainer, { revert: false }); // leave the reveals' inline styles in place
 ```
 
 `init()` is idempotent — already-initialized elements are skipped, so you can safely call it again as new content is added (e.g. infinite scroll).
@@ -132,9 +133,15 @@ Each call waits only for the elements it claims. If an earlier call is still loa
 
 Recomputes every ScrollTrigger's start/end positions. ScrollTrigger already refreshes on window resize and load, but a **JavaScript-driven layout change doesn't fire that** — so call `refresh()` after toggling a grid's column count, opening an accordion, or when fonts/images finish loading and shift the page. Calls are coalesced to one refresh per frame, so it's cheap to call repeatedly.
 
-### `destroy(container?)`
+The refresh after `refresh()`, and the one `init()` schedules once something new is armed, run in ScrollTrigger's safe mode: about 200 ms later, and only once the page has stopped scrolling. A smooth scroll in progress (`scroll-behavior: smooth`, a scroll-to tween, Lenis) or a landing on a `#hash` link carries on undisturbed. That also means `refresh()` returns before the positions have changed. If you need them recomputed at once, call `ScrollTrigger.refresh()` yourself.
+
+### `destroy(container?, options?)`
 
 With no argument, kills all tweens + ScrollTriggers, reverts SplitText, and forgets every element — a later `init()` re-runs the whole page. Pass a `container` to tear down only the reveals on or inside it; those elements are forgotten too, so re-adding content there and calling `init()` re-animates just that subtree. `contains` works on detached nodes, so you can pass a subtree you're about to remove. Use the scoped form for SPA partial swaps, the bare form for a full route change.
+
+By default `destroy()` puts every element it tears down back as it was before `init()`. The props reveals animate (`opacity`, `transform`, `clip-path`, `filter`) go back to their values from before `init()`, on the element and on children the type changed (`batch` items). Any other inline style, such as one your own code set since, stays. An element that hadn't revealed yet shows as written instead of staying hidden in its starting state, and a counter shows the number it counts to, whether or not it got there. Each element keeps `data-reveal-state`, so `reveal.css` doesn't hide it again, and if a pre-hide rule of your own would, it gets `opacity: 1`.
+
+Pass `{ revert: false }` to leave the reveals' inline styles where they are, for example when you're about to remove or replace the elements anyway. Calling `init()` on such an element later reads whatever is still inline as the element's own style, so an element that hadn't revealed yet starts from its old starting state as if that were its resting place. Use the default if you plan to `init()` it again.
 
 `destroy()` also covers an `init()` that is still loading types. That call skips the elements you destroyed, so `init(); destroy(); init()` arms each element once. An element removed from the page while its type loads isn't armed either, and a later `init()` picks it up if it comes back. A subtree that was never on the page, such as a card you call `init(card)` on just before inserting it, is armed as usual.
 
@@ -162,26 +169,33 @@ Each option is named after its attribute without the `data-reveal-` prefix, so `
 3. `defaults`
 4. the type's built-in value
 
-A global default applies to every type that reads the option, with three exceptions where the option means something else to the type: `parallax` ignores a global `start` and `end`, which would shrink its scroll range; `counter` ignores a global `duration`, which would rush the count; and `split` ignores a global `stagger`, which is per character there. They still apply when set in `typeDefaults` or as an attribute.
+A global default applies to every type that reads the option, except where the option means something else to the type:
+
+- `parallax` ignores a global `start` and `end`, which would shrink its scroll range.
+- `counter` ignores a global `duration`, which would rush the count, a global `ease`, which could overshoot the target (1,262 on the way to 1,200), and a global `from`.
+- `scale` ignores a global `from`, which is a starting number for `counter`, not a scale.
+- `split` ignores a global `stagger`, which is per character there.
+
+These still apply when set in `typeDefaults` or as an attribute.
 
 | Option | Read by |
 |--------|---------|
 | `duration` | every type but `parallax` (`counter` ignores a global one) |
+| `keep` | `fade`, `scale`, `blur`, `clip`, `rotate`, `slide`, `batch` |
 | `delay` | `fade`, `scale`, `split`, `blur`, `clip`, `rotate`, `slide` |
 | `start` | every type (`parallax` ignores a global one) |
 | `end` | `parallax` (ignores a global one) |
-| `ease`, `reverse` | every type but `parallax` |
+| `ease` | every type but `parallax` (`counter` ignores a global one) |
+| `reverse` | every type but `parallax` |
 | `distance` | `fade`, `batch` |
 | `stagger` | `split` (ignores a global one), `batch` |
 | `direction` | `fade`, `clip`, `slide` |
-| `from` | `scale` (starting scale), `counter` (starting number) |
+| `from` | `scale` (starting scale), `counter` (starting number), both ignoring a global one |
 | `to`, `decimals`, `separator`, `prefix`, `suffix` | `counter` |
 | `blur` | `blur` |
 | `axis`, `rotate` | `rotate` |
 | `split` | `split` |
 | `speed` | `parallax` |
-
-Since `from` means a different thing to each type that reads it, set it in `typeDefaults` rather than `defaults`.
 
 Values in `defaults` and `typeDefaults` are read the same way as attributes, so `"0.5"` works for a duration, `"false"` turns `reverse` off, and an empty `start` counts as unset.
 
@@ -198,10 +212,26 @@ All types accept these shared attributes:
 | `data-reveal-start` | `top 85%` | ScrollTrigger `start` position. See below for content near the end of the page. |
 | `data-reveal-ease` | varies | Any GSAP ease, e.g. `power2.out`. Each type has its own built-in ease. (`parallax` is scrubbed and ignores this.) |
 | `data-reveal-reverse` | off | Add it to play the animation out again when scrolling back up past `start`. Default is play-once. (`parallax` is always bidirectional and ignores this.) |
+| `data-reveal-keep` | off | Add it to keep the end state inline once the reveal finishes. See below. |
 
 An element near the end of the page, such as one in the footer, may never scroll as far up as `top 85%`. With the built-in start it still plays: once the page is scrolled to the bottom, or straight away on a page too short to scroll. The start is measured against the element's scroller, so this holds inside a scrolling container set with `ScrollTrigger.defaults({ scroller })` too. A start you set yourself is used exactly as given. To get the same for it, wrap it in `clamp()` too, as in `data-reveal-start="clamp(top 75%)"`. Keep that to content below the fold: `clamp()` also holds back content that's in view when the page loads until the first scroll.
 
-Without an ease of your own, each type keeps the one it has always had, whatever `gsap.defaults()` says.
+Without an ease of your own, each type keeps the one it has always had, whatever `gsap.defaults()` says. Eases go by name. For a custom one, register it first, as in `CustomEase.create("house", "0.2, 0, 0, 1")`, then set `ease: "house"` or `data-reveal-ease="house"`. A function in `defaults` isn't used.
+
+### After a reveal
+
+When a play-once reveal finishes, it leaves nothing inline. The props it animated (`opacity`, `transform`, `clip-path`, `filter`) go back to the element's own CSS without a jump, because each reveal ends where that CSS puts the element:
+
+- at its own opacity, so a `.muted { opacity: 0.6 }` element ends at 0.6;
+- at its own transform, including the `translate`, `rotate` and `scale` properties that Tailwind v4's utilities set. `fade`, `slide`, `scale`, `rotate` and `batch` items start from that transform plus their own offset, so an element centred with `translateX(-50%)` stays centred while it slides in, and `scale`'s `from` is relative to the element's own scale.
+
+Before 0.4 the end state stayed inline, which got in the way:
+
+- Any transform, even `translate(0, 0)`, makes the element the containing block for `position: fixed` descendants, so a fixed overlay inside it scrolled with it.
+- `clip-path: inset(0)` cut off anything that overflowed the box, such as shadows, badges and dropdowns.
+- Inline `opacity: 1` beat classes, such as a hover dim.
+
+Two cases keep the end state inline. `data-reveal-reverse` needs it to play backwards, and `data-reveal-keep` (or `keep` in the defaults) asks for it. Under reduced motion nothing is set inline in the first place. If a pre-hide rule of your own hides `[data-reveal]` outright, a finished reveal keeps `opacity: 1` inline so it stays visible. `split` still keeps its end state for now.
 
 ### `fade`
 Fade + translate in.
@@ -216,7 +246,7 @@ Fade + scale up.
 
 | Attribute | Default | Notes |
 |-----------|---------|-------|
-| `data-reveal-from` | `0.92` | Starting scale |
+| `data-reveal-from` | `0.92` | Starting scale, relative to the element's own |
 
 ### `split`
 Per-character/word/line text reveal (uses SplitText).

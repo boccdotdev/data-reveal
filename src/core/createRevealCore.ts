@@ -14,6 +14,15 @@ export type RevealResolver = (
 // ScrollTrigger.refresh() recalculates every trigger globally and forces a
 // synchronous layout. Coalesce calls into one per frame so repeated init()
 // (e.g. infinite scroll) doesn't thrash layout.
+//
+// Safe mode: in GSAP 3.13 to 3.15, refresh(true) restarts a 0.2 s delayed
+// call instead of refreshing at once, and that delayed refresh isn't forced,
+// so if the page has scrolled in the last ~200 ms it waits for ScrollTrigger's
+// "scrollEnd" event first. A plain refresh() runs straight away and moves the
+// scroll position while it measures, which aborts a smooth scroll in flight
+// (`scroll-behavior: smooth`, a scrollTo tween, Lenis). Safe mode needs
+// ScrollTrigger to be set up, which it is once any trigger exists, and with
+// no triggers there's nothing to refresh anyway.
 let refreshQueued = false;
 async function scheduleRefresh(): Promise<void> {
   if (refreshQueued) return;
@@ -22,7 +31,7 @@ async function scheduleRefresh(): Promise<void> {
     const { ScrollTrigger } = await import("gsap/ScrollTrigger");
     requestAnimationFrame(() => {
       refreshQueued = false;
-      ScrollTrigger.refresh();
+      if (ScrollTrigger.getAll().length > 0) ScrollTrigger.refresh(true);
     });
   } catch {
     // ScrollTrigger didn't load (e.g. its chunk is gone after a deploy), so
@@ -55,12 +64,15 @@ interface Scan {
 
 // Global defaults a type ignores, because the key means something else to it.
 // A global `start` places a one-shot reveal's trigger, not a parallax range.
-// A global `duration` sized for reveals would rush a count. A global
-// `stagger` is per item, not per character. These still apply when set in
-// `typeDefaults` or as an attribute.
+// A global `duration` sized for reveals would rush a count, and an
+// overshooting ease would count past the target. `from` is a starting scale
+// for `scale` but a starting number for `counter`. A global `stagger` is per
+// item, not per character. These still apply when set in `typeDefaults` or
+// as an attribute.
 const globalsIgnored = new Map<string, Array<keyof RevealOptions>>([
   ["parallax", ["start", "end"]],
-  ["counter", ["duration"]],
+  ["counter", ["duration", "from", "ease"]],
+  ["scale", ["from"]],
   ["split", ["stagger"]],
 ]);
 
@@ -84,13 +96,25 @@ export interface RevealInstance {
    */
   refresh(): void;
   /**
-   * Tear down reveals. With no argument, kills everything and forgets all
+   * Tear down reveals. With no container, kills everything and forgets all
    * elements so a later `init()` re-runs the whole page. With a container,
    * kills only reveals on or inside it and forgets just those elements, so
    * re-adding content there and calling `init()` re-animates it. Elements an
    * unfinished `init()` is still loading are dropped from that call.
+   *
+   * By default every element goes back to how it was before `init()`: the
+   * props reveals animate (opacity, transforms, clip-path, filter), on the
+   * element and on children the type styled, with any other inline styles
+   * left as they are. A counter shows the number it counts to. Pass
+   * `{ revert: false }` to leave the reveals' inline styles in place, e.g.
+   * when the elements are about to be removed anyway.
    */
-  destroy(container?: ParentNode): void;
+  destroy(container?: ParentNode, options?: RevealDestroyOptions): void;
+}
+
+export interface RevealDestroyOptions {
+  /** Put elements back as they were before `init()`. Default `true`. */
+  revert?: boolean;
 }
 
 /**
@@ -166,18 +190,19 @@ export function createRevealCore(
       // Set first, so reveal.css lets go before the type looks at the
       // element's opacity.
       setState(el, "ready");
-      const style = el.getAttribute("style");
+      // How the element looked before its type touched it, for destroy()
+      // and for handing props back when a reveal finishes.
+      registry.snapshot(el, el);
       try {
         init(el, ctx);
         armed = true;
       } catch (error) {
         errors.push(error);
         // Undo what the init got through before it threw: the tweens,
-        // triggers and splits it registered for this element, and the
-        // element's own inline styles. Children's styles aren't restored.
-        registry.killElement(el);
-        if (style === null) el.removeAttribute("style");
-        else el.setAttribute("style", style);
+        // triggers and splits it registered for this element, and the whole
+        // style attribute of the element and of anything else it
+        // snapshotted. Nothing else can have changed them yet.
+        registry.killElement(el, { restore: "style" });
         fail(el);
       }
     }
@@ -222,18 +247,22 @@ export function createRevealCore(
       scheduleRefresh();
     },
 
-    destroy(container?: ParentNode): void {
+    destroy(container?: ParentNode, { revert = true }: RevealDestroyOptions = {}): void {
+      let killed: Element[];
       if (!container) {
-        registry.killAll();
+        killed = registry.killAll({ restore: revert ? "animated" : "none" });
         claims = new WeakMap();
-        return;
+      } else {
+        // Forget every matching element so init() can re-animate it later.
+        container.querySelectorAll<HTMLElement>("[data-reveal]").forEach((el) => claims.delete(el));
+        if (container instanceof Element && container.matches("[data-reveal]")) {
+          claims.delete(container);
+        }
+        killed = registry.kill(container, { restore: revert ? "animated" : "none" });
       }
-      // Forget every matching element so init() can re-animate it later.
-      container.querySelectorAll<HTMLElement>("[data-reveal]").forEach((el) => claims.delete(el));
-      if (container instanceof Element && container.matches("[data-reveal]")) {
-        claims.delete(container);
-      }
-      registry.kill(container);
+      // Back as it was, an element is still marked as handled, so reveal.css
+      // leaves it alone, but a site's own pre-hide could hide it again.
+      if (revert) killed.forEach((el) => unhide(el as HTMLElement));
     },
   };
 }

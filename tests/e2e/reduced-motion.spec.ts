@@ -7,6 +7,8 @@ import {
   initResult,
   instanceReady,
   isClipped,
+  leftovers,
+  nothingLeft,
   scrollTo,
   test,
 } from "./helpers";
@@ -27,6 +29,15 @@ test("every type snaps to its end state without scrolling", async ({ page, fixtu
   expect(await isClipped(page.locator("#clip"))).toBe(false);
   // No split.
   await expect(page.locator("#split *")).toHaveCount(0);
+});
+
+test("leaves no transform, clip-path or filter behind", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("types"));
+  expect(await initResult(page)).toBe("resolved");
+
+  for (const type of allTypes) {
+    expect(await leftovers(page.locator(`#${type}`))).toEqual(nothingLeft);
+  }
 });
 
 test("parallax doesn't move", async ({ page, fixtureUrl }) => {

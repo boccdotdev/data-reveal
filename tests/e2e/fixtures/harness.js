@@ -1,6 +1,7 @@
 // Runs data-reveal on a fixture page and reports back on window.__reveal:
 // `instance` once the package has loaded, then `settled` and `result` once
-// init() has finished. If the package fails to load, `result` starts with
+// init() has finished, and `refreshes`, a count of finished position
+// refreshes. If the package fails to load, `result` starts with
 // "failed to load" and `settled` is set straight away.
 //
 // Query parameters, on top of the ones head.js reads:
@@ -26,15 +27,20 @@ const entries = {
       const { ScrollTrigger } = await import("gsap/ScrollTrigger");
       ScrollTrigger.defaults({ scroller: selector });
     },
+    async onRefresh(callback) {
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+      ScrollTrigger.addEventListener("refresh", callback);
+    },
   },
 };
 
-const report = (window.__reveal = { instance: null, settled: false, result: null });
+const report = (window.__reveal = { instance: null, settled: false, result: null, refreshes: 0 });
 
 async function create() {
   const entry = entries[engine];
   if (!entry) throw new Error(`Unknown engine "${engine}"`);
   if (params.has("scroller")) await entry.useScroller(params.get("scroller"));
+  await entry.onRefresh(() => report.refreshes++);
   if (params.get("mode") === "manual") {
     const names = params.has("types") ? params.get("types").split(",").filter(Boolean) : allTypes;
     const { createReveal } = await import(entry.manual);

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Two reveals on one element</title>
+</head>
+<body>
+  <p>A batch item that is also a fade of its own.</p>
+  <div class="gap"></div>
+  <ul id="list" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li id="both" data-reveal-item data-reveal="fade" data-reveal-duration="0.2">batch item and fade</li>
+    <li id="plain" data-reveal-item>batch item</li>
+  </ul>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

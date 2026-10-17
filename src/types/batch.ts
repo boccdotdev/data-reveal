@@ -1,9 +1,11 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
-import { unhide } from "../core/visibility.js";
+import { shownOpacity, unhide } from "../core/visibility.js";
+import { finishIfLast } from "../internal/finish.js";
 import { option, options } from "../internal/options.js";
-import { isReverse, revealStart } from "../internal/trigger.js";
+import { ownTransform } from "../internal/transform.js";
+import { cleansUp, isReverse, revealStart } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -15,7 +17,7 @@ export const init: RevealInit = (el, ctx) => {
 
   if (ctx.reduced) {
     unhide(el);
-    gsap.set(targets, { opacity: 1 });
+    targets.forEach(unhide);
     return;
   }
 
@@ -28,9 +30,30 @@ export const init: RevealInit = (el, ctx) => {
   // built-in ones differ: an overshoot in, a plain ease out.
   const ease = option(el, ctx, "ease");
   const reverse = isReverse(el, ctx);
+  // Each item hands its props back as soon as its own reveal finishes.
+  const itemStagger = cleansUp(el, ctx)
+    ? {
+        each: stagger,
+        onComplete(this: gsap.core.Tween) {
+          finishIfLast(this, this.targets()[0] as HTMLElement);
+        },
+      }
+    : stagger;
 
   unhide(el);
-  gsap.set(targets, { opacity: 0, y: distance });
+  // Each item ends at its own opacity and position, read before it's hidden.
+  targets.forEach((item) => registry.snapshot(el, item));
+  const opacities = new Map(targets.map((item) => [item, shownOpacity(item)]));
+  const ownY = new Map(targets.map((item) => [item, ownTransform(item).y]));
+  const shown = {
+    opacity: (_index: number, item: HTMLElement) => opacities.get(item) ?? 1,
+    y: (_index: number, item: HTMLElement) => ownY.get(item) ?? 0,
+  };
+  const hidden = {
+    opacity: 0,
+    y: (_index: number, item: HTMLElement) => (ownY.get(item) ?? 0) + distance,
+  };
+  gsap.set(targets, hidden);
 
   // One trigger per item, so a built-in start measures each item.
   const triggers = ScrollTrigger.batch(targets, {
@@ -38,10 +61,9 @@ export const init: RevealInit = (el, ctx) => {
     once: !reverse,
     onEnter: (group) => {
       gsap.to(group, {
-        opacity: 1,
-        y: 0,
+        ...shown,
         duration,
-        stagger,
+        stagger: itemStagger,
         ease: ease ?? "back.out(1.4)",
         overwrite: true,
       });
@@ -49,8 +71,7 @@ export const init: RevealInit = (el, ctx) => {
     onLeaveBack: reverse
       ? (group) => {
           gsap.to(group, {
-            opacity: 0,
-            y: distance,
+            ...hidden,
             duration,
             stagger,
             ease: ease ?? "power2.in",

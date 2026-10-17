@@ -1,8 +1,11 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
+import { shownOpacity, unhide } from "../core/visibility.js";
+import { finishIfLast } from "../internal/finish.js";
 import { options } from "../internal/options.js";
-import { revealTrigger } from "../internal/trigger.js";
+import { ownTransform } from "../internal/transform.js";
+import { cleansUp, revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -17,7 +20,7 @@ const directionMap: Record<Direction, { xPercent?: number; yPercent?: number }> 
 
 export const init: RevealInit = (el, ctx) => {
   if (ctx.reduced) {
-    gsap.set(el, { opacity: 1, xPercent: 0, yPercent: 0 });
+    unhide(el);
     return;
   }
 
@@ -28,21 +31,28 @@ export const init: RevealInit = (el, ctx) => {
     ease: "power3.out",
   });
 
+  const opacity = shownOpacity(el);
+  const own = ownTransform(el);
   const dir = directionMap[direction] ?? directionMap.up;
   gsap.set(el, {
     opacity: 0,
-    xPercent: dir.xPercent ?? 0,
-    yPercent: dir.yPercent ?? 0,
+    xPercent: own.xPercent + (dir.xPercent ?? 0),
+    yPercent: own.yPercent + (dir.yPercent ?? 0),
   });
 
   const tween = gsap.to(el, {
-    opacity: 1,
-    xPercent: 0,
-    yPercent: 0,
+    opacity,
+    xPercent: own.xPercent,
+    yPercent: own.yPercent,
     duration,
     delay,
     ease,
     scrollTrigger: revealTrigger(el, ctx),
+    onComplete: cleansUp(el, ctx)
+      ? function (this: gsap.core.Tween) {
+          finishIfLast(this, el);
+        }
+      : undefined,
   });
 
   registry.track(el, tween);

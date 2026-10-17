@@ -6,7 +6,7 @@ import { createReveal as createManualReveal } from "../../src/manual";
 import { el, html, state } from "./helpers";
 
 // Arming an element schedules a ScrollTrigger refresh.
-vi.mock("gsap/ScrollTrigger", () => ({ ScrollTrigger: { refresh: vi.fn() } }));
+vi.mock("gsap/ScrollTrigger", () => ({ ScrollTrigger: { refresh: vi.fn(), getAll: () => [] } }));
 
 // Stand-ins for the fade and scale modules that record the options they
 // resolve, as the real types do.

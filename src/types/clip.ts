@@ -2,8 +2,9 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
+import { finishIfLast } from "../internal/finish.js";
 import { options } from "../internal/options.js";
-import { revealTrigger } from "../internal/trigger.js";
+import { cleansUp, revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -19,7 +20,6 @@ const fromClip: Record<Direction, string> = {
 
 export const init: RevealInit = (el, ctx) => {
   if (ctx.reduced) {
-    gsap.set(el, { clipPath: "inset(0 0 0 0)" });
     unhide(el);
     return;
   }
@@ -40,6 +40,11 @@ export const init: RevealInit = (el, ctx) => {
     delay,
     ease,
     scrollTrigger: revealTrigger(el, ctx),
+    onComplete: cleansUp(el, ctx)
+      ? function (this: gsap.core.Tween) {
+          finishIfLast(this, el);
+        }
+      : undefined,
   });
 
   registry.track(el, tween);

@@ -96,6 +96,98 @@ export function isClipped(target: Locator): Promise<boolean> {
   });
 }
 
+/** What a finished reveal could leave behind: computed transform, clip-path and filter. */
+export function leftovers(target: Locator): Promise<{ transform: string; clipPath: string; filter: string }> {
+  return target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { transform: style.transform, clipPath: style.clipPath, filter: style.filter };
+  });
+}
+
+export const nothingLeft = { transform: "none", clipPath: "none", filter: "none" };
+
+/**
+ * Waits until the window stops scrolling and returns where it stopped:
+ * 300 ms without movement once it has moved, or 2 s if it never does (a
+ * scroll stopped before it started). Timed rather than counted in frames, so
+ * a busy machine doesn't cut it short.
+ */
+export async function scrollSettled(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const start = window.scrollY;
+        let last = start;
+        let since = performance.now();
+        const check = (now: number) => {
+          if (window.scrollY !== last) {
+            last = window.scrollY;
+            since = now;
+          }
+          if (now - since >= (last === start ? 2000 : 300)) resolve(last);
+          else requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+      }),
+  );
+}
+
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  inline: boolean;
+}
+
+/**
+ * Scrolls the element into view and records its box each frame, relative to
+ * its `.stage` (or the page), until its reveal has handed its inline
+ * transform back and five more frames have passed. `inline` says whether a
+ * transform was still set inline in that frame.
+ */
+export async function sampleReveal(page: Page, id: string): Promise<Box[]> {
+  return page.evaluate(
+    (id) =>
+      new Promise<Box[]>((resolve) => {
+        const element = document.getElementById(id) as HTMLElement;
+        const stage = (element.closest(".stage") as HTMLElement | null) ?? document.body;
+        const samples: Box[] = [];
+        let after = 0;
+        const sample = () => {
+          const box = element.getBoundingClientRect();
+          const origin = stage.getBoundingClientRect();
+          const inline = element.style.transform !== "" || element.style.translate !== "";
+          samples.push({ x: box.x - origin.x, y: box.y - origin.y, width: box.width, height: box.height, inline });
+          if (samples.some((s) => s.inline) && !inline) after++;
+          if (after >= 5 || samples.length > 600) resolve(samples);
+          else requestAnimationFrame(sample);
+        };
+        element.scrollIntoView({ block: "center" });
+        requestAnimationFrame(sample);
+      }),
+    id,
+  );
+}
+
+/** The box of `#<id>-twin`, an unrevealed copy with the same CSS, relative to its `.stage`. */
+export async function twinBox(page: Page, id: string): Promise<Omit<Box, "inline">> {
+  return page.evaluate((id) => {
+    const element = document.getElementById(`${id}-twin`) as HTMLElement;
+    const box = element.getBoundingClientRect();
+    const origin = (element.closest(".stage") as HTMLElement).getBoundingClientRect();
+    return { x: box.x - origin.x, y: box.y - origin.y, width: box.width, height: box.height };
+  }, id);
+}
+
+/** The largest change in position or size between the frame a reveal handed its transform back and the one before. */
+export function jumpAtFinish(samples: Box[]): number {
+  const handed = samples.findIndex((s, i) => i > 0 && samples[i - 1].inline && !s.inline);
+  if (handed < 1) return Number.NaN;
+  const [before, at] = [samples[handed - 1], samples[handed]];
+  return Math.max(...(["x", "y", "width", "height"] as const).map((key) => Math.abs(at[key] - before[key])));
+}
+
 /** The element's top relative to the document, which moves only if something offsets it. */
 export function documentTop(target: Locator): Promise<number> {
   return target.evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
@@ -104,9 +196,14 @@ export function documentTop(target: Locator): Promise<number> {
 declare global {
   interface Window {
     __reveal: {
-      instance: { init(container?: ParentNode): Promise<void> } | null;
+      instance: {
+        init(container?: ParentNode): Promise<void>;
+        refresh(): void;
+        destroy(container?: ParentNode, options?: { revert?: boolean }): void;
+      } | null;
       settled: boolean;
       result: string | null;
+      refreshes: number;
     };
   }
 }

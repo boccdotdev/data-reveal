@@ -53,6 +53,15 @@ export function isReverse(el: HTMLElement, ctx: RevealContext): boolean {
   return option(el, ctx, "reverse") ?? false;
 }
 
+/**
+ * Whether a finished reveal hands the props it animated back to the element's
+ * own CSS (`finish()` in `core/visibility.ts`). Not with `reverse`, which
+ * plays back from its inline end state, nor when `keep` asks to keep it.
+ */
+export function cleansUp(el: HTMLElement, ctx: RevealContext): boolean {
+  return !isReverse(el, ctx) && !option(el, ctx, "keep");
+}
+
 // With `reverse` the animation plays out again when scrolling back up past
 // `start`; otherwise it plays once.
 export function revealTrigger(el: HTMLElement, ctx: RevealContext): RevealTrigger {

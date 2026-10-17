@@ -1,15 +1,18 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
+import { shownOpacity, unhide } from "../core/visibility.js";
+import { finishIfLast } from "../internal/finish.js";
 import { options } from "../internal/options.js";
-import { revealTrigger } from "../internal/trigger.js";
+import { ownTransform } from "../internal/transform.js";
+import { cleansUp, revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const init: RevealInit = (el, ctx) => {
   if (ctx.reduced) {
-    gsap.set(el, { opacity: 1, rotationX: 0, rotationY: 0, rotation: 0 });
+    unhide(el);
     return;
   }
 
@@ -21,28 +24,37 @@ export const init: RevealInit = (el, ctx) => {
     ease: "power3.out",
   });
 
+  // Turn from the element's own angle plus `rotate`, back to its own angle,
+  // around its own transform-origin.
+  const opacity = shownOpacity(el);
+  const own = ownTransform(el);
   const fromVars: Record<string, number> = { opacity: 0, transformPerspective: 800 };
   const toRotation: Record<string, number> = {};
   if (axis === "y") {
-    fromVars.rotationY = amount;
-    toRotation.rotationY = 0;
+    fromVars.rotationY = own.rotationY + amount;
+    toRotation.rotationY = own.rotationY;
   } else if (axis === "z") {
-    fromVars.rotation = amount;
-    toRotation.rotation = 0;
+    fromVars.rotation = own.rotation + amount;
+    toRotation.rotation = own.rotation;
   } else {
-    fromVars.rotationX = -amount;
-    toRotation.rotationX = 0;
+    fromVars.rotationX = own.rotationX - amount;
+    toRotation.rotationX = own.rotationX;
   }
 
-  gsap.set(el, { ...fromVars, transformOrigin: "center" });
+  gsap.set(el, fromVars);
 
   const tween = gsap.to(el, {
-    opacity: 1,
+    opacity,
     ...toRotation,
     duration,
     delay,
     ease,
     scrollTrigger: revealTrigger(el, ctx),
+    onComplete: cleansUp(el, ctx)
+      ? function (this: gsap.core.Tween) {
+          finishIfLast(this, el);
+        }
+      : undefined,
   });
 
   registry.track(el, tween);

@@ -1,3 +1,5 @@
+import { registry } from "./registry.js";
+
 // Makes sure an element the package has let go of can be seen. The core calls
 // it for failed and skipped elements, and types call it when they don't
 // animate the element's own opacity. `data-reveal-state` is already set by
@@ -6,6 +8,29 @@
 // so show it. Any other value is the element's own opacity and is left alone.
 export function unhide(el: HTMLElement): void {
   if (restingOpacity(el) === "0") el.style.opacity = "1";
+}
+
+/**
+ * The opacity a reveal should end at: the element's own, or 1 if it would
+ * otherwise settle at 0 (a site's own pre-hide). Read it before hiding the
+ * element, so a finished reveal can hand opacity back to the element's CSS
+ * without a jump.
+ */
+export function shownOpacity(el: HTMLElement): number {
+  const opacity = parseFloat(restingOpacity(el) ?? "");
+  return opacity > 0 ? opacity : 1;
+}
+
+/**
+ * Called when a play-once reveal finishes on `target`. Hands the props it
+ * animated back to the element's own CSS, so nothing is left inline: no
+ * transform to trap `position: fixed` children, no clip-path to cut off
+ * overflow, no opacity to beat a hover class. Then makes sure a site's own
+ * pre-hide can't hide it again.
+ */
+export function finish(target: HTMLElement): void {
+  registry.restoreAnimated(target);
+  unhide(target);
 }
 
 // The opacity the element settles at, or null while an animation of the
