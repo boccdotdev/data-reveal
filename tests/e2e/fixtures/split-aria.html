@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Split text and assistive tech</title>
+</head>
+<body>
+  <!-- data-reveal-keep keeps each split in place after its reveal. -->
+  <h2 id="heading" data-reveal="split" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Split heading</h2>
+  <p id="para" data-reveal="split" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Split paragraph text</p>
+  <p id="linked" data-reveal="split" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Read <a href="#guide">the guide</a> first</p>
+  <p id="words" data-reveal="split" data-reveal-split="words" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Split into words</p>
+  <p id="lines" data-reveal="split" data-reveal-split="lines" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Split into lines</p>
+  <p id="auto" data-reveal="split" data-reveal-aria="auto" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Labelled by SplitText</p>
+  <p id="once" data-reveal="split" data-reveal-duration="0.2" data-reveal-stagger="0">Back to plain text</p>
+  <div class="gap"></div>
+  <!-- Below the fold, so it's split and waiting to play. -->
+  <p id="waiting" data-reveal="split" data-reveal-duration="0.2" data-reveal-stagger="0">Copy <a href="#guide">this text</a> once, please</p>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

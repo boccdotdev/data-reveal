@@ -21,12 +21,20 @@ type Vars = Record<string, unknown> & { scrollTrigger?: { start?: unknown } };
 // `own` is the transform getProperty() reports, as if from the element's CSS.
 const recorded = vi.hoisted(() => ({
   to: [] as Array<Record<string, unknown>>,
+  // What each to() call returned.
+  tweens: [] as Array<{ kill: () => void }>,
   fromTo: [] as Array<Record<string, unknown>>,
   batch: [] as Array<Record<string, unknown>>,
   set: [] as Array<Record<string, unknown>>,
   own: {} as Record<string, number>,
   // The tweens getTweensOf() reports as running on a target.
   active: [] as unknown[],
+  // How many getProperty() calls asked GSAP to read the element afresh.
+  uncached: 0,
+  // What SplitText.create() was given, the pieces it "split" into, and its revert().
+  splitVars: undefined as Record<string, unknown> | undefined,
+  pieces: [] as Element[],
+  splitReverted: 0,
 }));
 vi.mock("gsap", () => ({
   gsap: {
@@ -35,11 +43,15 @@ vi.mock("gsap", () => ({
       recorded.set.push(vars);
     },
     getTweensOf: () => recorded.active,
-    getProperty: (_target: unknown, property: string) =>
-      recorded.own[property] ?? (property.startsWith("scale") ? 1 : 0),
+    getProperty: (_target: unknown, property: string, _unit?: string, uncache?: boolean) => {
+      if (uncache) recorded.uncached++;
+      return recorded.own[property] ?? (property.startsWith("scale") ? 1 : 0);
+    },
     to: (_target: unknown, vars: Record<string, unknown>) => {
       recorded.to.push(vars);
-      return { kill: () => {} };
+      const tween = { kill: vi.fn() };
+      recorded.tweens.push(tween);
+      return tween;
     },
     fromTo: (_target: unknown, _from: unknown, vars: Record<string, unknown>) => {
       recorded.fromTo.push(vars);
@@ -56,16 +68,38 @@ vi.mock("gsap/ScrollTrigger", () => ({
   },
 }));
 vi.mock("gsap/SplitText", () => ({
-  SplitText: { create: () => ({ chars: [], words: [], lines: [], revert: () => {} }) },
+  SplitText: {
+    // Hands back the pieces a test set up, and runs onSplit as SplitText does.
+    create: (_target: unknown, vars: Record<string, unknown> & { onSplit?: (self: unknown) => unknown }) => {
+      recorded.splitVars = vars;
+      const pieces = recorded.pieces;
+      const self = {
+        chars: pieces,
+        words: pieces,
+        lines: pieces,
+        isSplit: true,
+        revert: () => {
+          recorded.splitReverted++;
+        },
+      };
+      vars.onSplit?.(self);
+      return self;
+    },
+  },
 }));
 
 beforeEach(() => {
   recorded.to.length = 0;
+  recorded.tweens.length = 0;
   recorded.fromTo.length = 0;
   recorded.batch.length = 0;
   recorded.set.length = 0;
   recorded.own = {};
   recorded.active = [];
+  recorded.uncached = 0;
+  recorded.splitVars = undefined;
+  recorded.pieces = [];
+  recorded.splitReverted = 0;
   document.body.innerHTML = "";
 });
 
@@ -116,38 +150,82 @@ describe.each(builtInEases)("%s", (_name, init, builtInEase) => {
 // Play-once types, which hand the props they animated back when they finish.
 const oneShot = builtInEases.filter(([name]) => name !== "split" && name !== "counter");
 
-describe.each(oneShot)("%s when it finishes", (_name, init) => {
-  it("hands the animated props back to the element's own CSS", () => {
-    const target = element('style="color: red;"');
+describe.each(oneShot)("%s when it finishes", (name, init) => {
+  // Runs the type on a target with an inline style of its own and the end
+  // state GSAP would leave, then completes its tween.
+  function complete(attributes: string, defaults: RevealContext["defaults"] = {}, before?: (target: HTMLElement) => void) {
+    const target = element(`style="color: red;" ${attributes}`);
     // As the core does before a type's init.
     registry.snapshot(target, target);
-    init(target, { reduced: false, defaults: {} });
+    init(target, { reduced: false, defaults });
     const vars = recorded.to[recorded.to.length - 1];
-    // Stand in for the end state GSAP leaves inline.
     Object.assign(target.style, {
       opacity: "1",
       transform: "translate(0px, 0px)",
       clipPath: "inset(0px)",
       filter: "blur(0px)",
     });
-
-    const tween = {};
-    recorded.active = [tween];
+    const tween = { targets: () => [target] };
+    (vars.onStart as (this: unknown) => void).call(tween);
+    before?.(target);
     (vars.onComplete as (this: unknown) => void).call(tween);
-    expect(target.style.cssText).toBe("color: red;");
+    return target;
+  }
+
+  it("hands the animated props back to the element's own CSS", () => {
+    expect(complete("").style.cssText).toBe("color: red;");
+  });
+
+  // Finishes on a target with GSAP's cache, then destroys it, and reports
+  // whether each one told GSAP to read the transform afresh.
+  function uncachedBy(css: string): { finish?: number; destroy?: number } {
+    document.head.innerHTML = `<style>#target { ${css} }</style>`;
+    const target = complete("", {}, (target) => Object.assign(target, { _gsap: {} })) as unknown as {
+      _gsap: { uncache?: number };
+    };
+    document.head.innerHTML = "";
+    const finish = target._gsap.uncache;
+    delete target._gsap.uncache;
+    registry.killAll({ restore: "animated" });
+    return { finish, destroy: target._gsap.uncache };
+  }
+
+  it("makes GSAP read the element's transform afresh, after finishing and on destroy(), when its CSS sets translate, rotate or scale", () => {
+    // blur and clip don't move the element, so GSAP's cache is still right.
+    const moves = name !== "blur" && name !== "clip";
+    for (const css of ["translate: 4px;", "rotate: 10deg;", "scale: 2;"]) {
+      expect(uncachedBy(css)).toEqual(moves ? { finish: 1, destroy: 1 } : {});
+    }
+  });
+
+  it("leaves GSAP's cache alone otherwise, so a site's own rotation: 270 stays 270", () => {
+    expect(uncachedBy("transform: rotate(10deg);")).toEqual({});
+  });
+
+  it("stops counting as animating the element when its tween is interrupted or reversed", () => {
+    for (const callback of ["onInterrupt", "onReverseComplete"]) {
+      const target = element();
+      registry.snapshot(target, target);
+      init(target, { reduced: false, defaults: {} });
+      const vars = recorded.to[recorded.to.length - 1];
+      const tween = { targets: () => [target] };
+      (vars.onStart as (this: unknown) => void).call(tween);
+      expect(registry.animating(target)).toBe(true);
+      (vars[callback] as (this: unknown) => void).call(tween);
+      expect(registry.animating(target)).toBe(false);
+    }
   });
 
   it("leaves them while another reveal is still animating the element", () => {
-    const target = element('style="color: red;"');
-    registry.snapshot(target, target);
-    init(target, { reduced: false, defaults: {} });
-    const vars = recorded.to[recorded.to.length - 1];
-    target.style.transform = "translate(0px, 20px)";
+    const other = document.createElement("ul");
+    const target = complete("", {}, (target) => registry.started(other, target));
+    expect(target.style.transform).toBe("translate(0px, 0px)");
+  });
 
-    const tween = {};
-    recorded.active = [tween, { another: "tween" }];
-    (vars.onComplete as (this: unknown) => void).call(tween);
-    expect(target.style.transform).toBe("translate(0px, 20px)");
+  it("isn't held up by a tween of the site's own on the element", () => {
+    // getTweensOf() reports a site tween; only the package's own reveals count.
+    recorded.active = [{ site: "tween" }];
+    expect(complete("").style.cssText).toBe("color: red;");
   });
 
   it("animates to the element's own opacity, so handing it back doesn't jump", () => {
@@ -159,9 +237,83 @@ describe.each(oneShot)("%s when it finishes", (_name, init) => {
   });
 
   it("keeps its end state with reverse or keep", () => {
-    expect(run(init, "data-reveal-reverse").onComplete).toBeUndefined();
-    expect(run(init, "data-reveal-keep").onComplete).toBeUndefined();
-    expect(run(init, "", { keep: true }).onComplete).toBeUndefined();
+    expect(complete("data-reveal-reverse").style.transform).toBe("translate(0px, 0px)");
+    expect(complete("data-reveal-keep").style.transform).toBe("translate(0px, 0px)");
+    expect(complete("", { keep: true }).style.transform).toBe("translate(0px, 0px)");
+  });
+});
+
+describe("split", () => {
+  function splitInto(attributes: string, defaults: RevealContext["defaults"] = {}): HTMLElement {
+    html(`<div id="target" ${attributes}><span id="one">Hello</span> <span id="two">there</span></div>`);
+    const target = document.getElementById("target") as HTMLElement;
+    recorded.pieces = Array.from(target.querySelectorAll("span"));
+    registry.snapshot(target, target);
+    split(target, { reduced: false, defaults });
+    return target;
+  }
+
+  it("re-splits on resize and font loading", () => {
+    splitInto('data-reveal-split="lines"');
+    expect(recorded.splitVars?.autoSplit).toBe(true);
+  });
+
+  it("puts a hidden copy of each word in front of it, for chars by default", () => {
+    const target = splitInto("");
+    expect(recorded.splitVars?.aria).toBe("none");
+    for (const id of ["one", "two"]) {
+      const piece = document.getElementById(id) as HTMLElement;
+      expect(piece.getAttribute("aria-hidden")).toBe("true");
+      expect(piece.previousElementSibling?.textContent).toBe(piece.textContent);
+    }
+    expect(target.hasAttribute("aria-label")).toBe(false);
+  });
+
+  it("leaves words and lines to be read as they are", () => {
+    for (const type of ["words", "lines"]) {
+      splitInto(`data-reveal-split="${type}"`);
+      expect(recorded.splitVars?.aria).toBe("none");
+      expect(document.querySelector("[aria-hidden]")).toBeNull();
+    }
+  });
+
+  it("takes aria from the attribute or the defaults", () => {
+    splitInto('data-reveal-aria="auto"');
+    expect(recorded.splitVars?.aria).toBe("auto");
+    splitInto('data-reveal-split="words"', { aria: "hidden" });
+    expect(document.getElementById("one")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("stops waiting on fonts once a play-once lines split finishes", () => {
+    // happy-dom has no font set.
+    const fonts = { addEventListener: vi.fn(), removeEventListener: vi.fn(), ready: Promise.resolve() };
+    Object.defineProperty(document, "fonts", { value: fonts, configurable: true });
+    try {
+      const target = splitInto('data-reveal-split="lines"');
+      const listener = fonts.addEventListener.mock.calls[0]?.[1];
+      expect(listener).toBeTypeOf("function");
+      const vars = recorded.to[recorded.to.length - 1];
+      const tween = { targets: () => recorded.pieces };
+      (vars.onStart as (this: unknown) => void).call(tween);
+      (vars.onComplete as (this: unknown) => void).call(tween);
+      expect(fonts.removeEventListener).toHaveBeenCalledWith("loading", listener);
+      registry.kill(target);
+    } finally {
+      delete (document as { fonts?: unknown }).fonts;
+    }
+  });
+
+  it("reverts a finished play-once split, but not one that keeps its end state", () => {
+    for (const [attributes, reverted] of [["", 1], ["data-reveal-keep", 0]] as const) {
+      recorded.splitReverted = 0;
+      const target = splitInto(attributes);
+      const vars = recorded.to[recorded.to.length - 1];
+      const tween = { targets: () => recorded.pieces };
+      (vars.onStart as (this: unknown) => void).call(tween);
+      (vars.onComplete as (this: unknown) => void).call(tween);
+      expect(recorded.splitReverted).toBe(reverted);
+      expect(registry.animating(target)).toBe(false);
+    }
   });
 });
 
@@ -188,6 +340,18 @@ describe("counter", () => {
 });
 
 describe("a transform of the element's own", () => {
+  it("is read from GSAP's cache on a first reveal, and afresh on a re-init", () => {
+    const target = element();
+    registry.snapshot(target, target);
+    fade(target, { reduced: false, defaults: {} });
+    expect(recorded.uncached).toBe(0);
+
+    registry.killAll({ restore: "animated" });
+    registry.snapshot(target, target);
+    fade(target, { reduced: false, defaults: {} });
+    expect(recorded.uncached).toBeGreaterThan(0);
+  });
+
   const lastSet = () => recorded.set[recorded.set.length - 1];
   const lastTo = () => recorded.to[recorded.to.length - 1];
 
@@ -265,7 +429,6 @@ describe("batch", () => {
     Object.assign(item.style, { opacity: "1", transform: "translate(0px, 0px)" });
 
     const itemTween = { targets: () => [item] };
-    recorded.active = [itemTween];
     tween.stagger.onComplete.call(itemTween);
     expect(item.hasAttribute("style")).toBe(false);
   });
@@ -284,12 +447,45 @@ describe("batch", () => {
   });
 
   it("keeps the items' end state with reverse or keep", () => {
-    const staggerOf = (vars: Vars) => {
-      (vars.onEnter as (group: Element[]) => void)([]);
-      return recorded.to[recorded.to.length - 1].stagger;
-    };
-    expect(staggerOf(batchVars("data-reveal-reverse"))).toBe(0.06);
-    expect(staggerOf(batchVars("data-reveal-keep"))).toBe(0.06);
+    for (const attributes of ["data-reveal-reverse", "data-reveal-keep"]) {
+      const vars = batchVars(attributes);
+      const item = document.querySelector("li") as HTMLElement;
+      (vars.onEnter as (group: Element[]) => void)([item]);
+      const tween = recorded.to[recorded.to.length - 1] as { stagger: { onComplete: (this: unknown) => void } };
+      item.style.transform = "translate(0px, 0px)";
+
+      tween.stagger.onComplete.call({ targets: () => [item] });
+      expect(item.style.transform).toBe("translate(0px, 0px)");
+    }
+  });
+
+  it("stops every group still animating on destroy(), not just the latest", () => {
+    registry.killAll();
+    const vars = batchVars("data-reveal-reverse");
+    const item = document.querySelector("li") as HTMLElement;
+    const enter = vars.onEnter as (group: Element[]) => void;
+    const leave = vars.onLeaveBack as (group: Element[]) => void;
+    enter([item]);
+    leave([item]);
+    enter([item]);
+    const groups = [...recorded.tweens];
+
+    registry.killAll({ restore: "animated" });
+    expect(groups).toHaveLength(3);
+    for (const tween of groups) expect(tween.kill).toHaveBeenCalled();
+  });
+
+  it("lets a group's tween go once it completes or is interrupted", () => {
+    for (const callback of ["onComplete", "onInterrupt"]) {
+      registry.killAll();
+      const vars = batchVars();
+      (vars.onEnter as (group: Element[]) => void)([document.querySelector("li") as Element]);
+      const tween = recorded.tweens[recorded.tweens.length - 1];
+      (recorded.to[recorded.to.length - 1][callback] as (this: unknown) => void).call(tween);
+
+      registry.killAll();
+      expect(tween.kill).not.toHaveBeenCalled();
+    }
   });
 
   it("uses the built-in start unless one is set", () => {

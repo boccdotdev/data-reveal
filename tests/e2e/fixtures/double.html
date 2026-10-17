@@ -13,6 +13,8 @@
   <ul id="list" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
     <li id="both" data-reveal-item data-reveal="fade" data-reveal-duration="0.2">batch item and fade</li>
     <li id="plain" data-reveal-item>batch item</li>
+    <!-- A slow fade, so a test can catch it mid-reveal. -->
+    <li id="late" data-reveal-item data-reveal="fade" data-reveal-duration="3">batch item and slow fade</li>
   </ul>
   <div class="gap"></div>
   <script type="module" src="./harness.js"></script>

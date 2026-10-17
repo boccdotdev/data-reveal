@@ -23,6 +23,7 @@ const kinds: Record<Key, "number" | "amount" | "string" | "text" | "flag"> = {
   axis: "string",
   rotate: "number",
   split: "string",
+  aria: "string",
   speed: "number",
   decimals: "number",
   separator: "text",

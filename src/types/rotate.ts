@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
-import { finishIfLast } from "../internal/finish.js";
+import { revealCallbacks } from "../internal/finish.js";
 import { options } from "../internal/options.js";
 import { ownTransform } from "../internal/transform.js";
 import { cleansUp, revealTrigger } from "../internal/trigger.js";
@@ -25,10 +25,12 @@ export const init: RevealInit = (el, ctx) => {
   });
 
   // Turn from the element's own angle plus `rotate`, back to its own angle,
-  // around its own transform-origin.
+  // around its own transform-origin. SVG elements turn around their centre,
+  // as they did before 0.4: their default origin is the canvas corner.
   const opacity = shownOpacity(el);
   const own = ownTransform(el);
-  const fromVars: Record<string, number> = { opacity: 0, transformPerspective: 800 };
+  const fromVars: Record<string, number | string> = { opacity: 0, transformPerspective: 800 };
+  if (el instanceof SVGElement) fromVars.transformOrigin = "center";
   const toRotation: Record<string, number> = {};
   if (axis === "y") {
     fromVars.rotationY = own.rotationY + amount;
@@ -50,11 +52,7 @@ export const init: RevealInit = (el, ctx) => {
     delay,
     ease,
     scrollTrigger: revealTrigger(el, ctx),
-    onComplete: cleansUp(el, ctx)
-      ? function (this: gsap.core.Tween) {
-          finishIfLast(this, el);
-        }
-      : undefined,
+    ...revealCallbacks(el, { cleanUp: cleansUp(el, ctx) }),
   });
 
   registry.track(el, tween);

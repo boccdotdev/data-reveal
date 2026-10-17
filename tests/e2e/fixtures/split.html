@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Split lines</title>
+  <style>
+    @font-face { font-family: Late; src: url("../font/late.ttf"); }
+    /* Narrows with the viewport, so a resize moves the line breaks. */
+    .column { width: 60vw; }
+    .column p { margin: 0 0 16px; }
+    .twin { visibility: hidden; }
+    /* Added by the test after init(), so the font starts loading then. */
+    .late { font-family: Late, sans-serif; }
+  </style>
+</head>
+<body>
+  <div class="column">
+    <!-- Each split sits above an unsplit twin with the same text and width. -->
+    <p id="lines" data-reveal="split" data-reveal-split="lines" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Split text is measured into lines when it is split, so the lines only match the text while the width and the font stay the same as they were at that moment.</p>
+    <p id="lines-twin" class="twin">Split text is measured into lines when it is split, so the lines only match the text while the width and the font stay the same as they were at that moment.</p>
+    <p id="late" data-reveal="split" data-reveal-split="lines" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Split text is measured into lines when it is split, so the lines only match the text while the width and the font stay the same as they were at that moment.</p>
+    <p id="late-twin" class="twin">Split text is measured into lines when it is split, so the lines only match the text while the width and the font stay the same as they were at that moment.</p>
+    <p id="once" data-reveal="split" data-reveal-split="lines" data-reveal-duration="0.2" data-reveal-stagger="0">Split text is measured into lines when it is split, so the lines only match the text while the width and the font stay the same as they were at that moment.</p>
+  </div>
+  <div class="gap"></div>
+  <div class="column">
+    <!-- Not revealed yet, so its trigger is still waiting. -->
+    <p id="below" data-reveal="split" data-reveal-split="lines" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Split text is measured into lines when it is split, so the lines only match the text while the width and the font stay the same as they were at that moment.</p>
+    <p id="below-twin" class="twin">Split text is measured into lines when it is split, so the lines only match the text while the width and the font stay the same as they were at that moment.</p>
+  </div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

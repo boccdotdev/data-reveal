@@ -181,7 +181,7 @@ These still apply when set in `typeDefaults` or as an attribute.
 | Option | Read by |
 |--------|---------|
 | `duration` | every type but `parallax` (`counter` ignores a global one) |
-| `keep` | `fade`, `scale`, `blur`, `clip`, `rotate`, `slide`, `batch` |
+| `keep` | `fade`, `scale`, `blur`, `clip`, `rotate`, `slide`, `batch`, `split` |
 | `delay` | `fade`, `scale`, `split`, `blur`, `clip`, `rotate`, `slide` |
 | `start` | every type (`parallax` ignores a global one) |
 | `end` | `parallax` (ignores a global one) |
@@ -194,7 +194,7 @@ These still apply when set in `typeDefaults` or as an attribute.
 | `to`, `decimals`, `separator`, `prefix`, `suffix` | `counter` |
 | `blur` | `blur` |
 | `axis`, `rotate` | `rotate` |
-| `split` | `split` |
+| `split`, `aria` | `split` |
 | `speed` | `parallax` |
 
 Values in `defaults` and `typeDefaults` are read the same way as attributes, so `"0.5"` works for a duration, `"false"` turns `reverse` off, and an empty `start` counts as unset.
@@ -231,7 +231,7 @@ Before 0.4 the end state stayed inline, which got in the way:
 - `clip-path: inset(0)` cut off anything that overflowed the box, such as shadows, badges and dropdowns.
 - Inline `opacity: 1` beat classes, such as a hover dim.
 
-Two cases keep the end state inline. `data-reveal-reverse` needs it to play backwards, and `data-reveal-keep` (or `keep` in the defaults) asks for it. Under reduced motion nothing is set inline in the first place. If a pre-hide rule of your own hides `[data-reveal]` outright, a finished reveal keeps `opacity: 1` inline so it stays visible. `split` still keeps its end state for now.
+Two cases keep the end state inline. `data-reveal-reverse` needs it to play backwards, and `data-reveal-keep` (or `keep` in the defaults) asks for it. Under reduced motion nothing is set inline in the first place. If a pre-hide rule of your own hides `[data-reveal]` outright, a finished reveal keeps `opacity: 1` inline so it stays visible. A finished `split` goes further and puts the element's own HTML back (see below).
 
 ### `fade`
 Fade + translate in.
@@ -255,6 +255,23 @@ Per-character/word/line text reveal (uses SplitText).
 |-----------|---------|--------|
 | `data-reveal-split` | `chars` | `chars` `words` `lines` |
 | `data-reveal-stagger` | `0.02` | Seconds between units |
+| `data-reveal-aria` | see below | `hidden` `none` `auto` |
+
+Lines are measured when the text is split, so `split` splits again, and rebuilds its animation, when a web font finishes loading or the element's width changes. That includes an element you `init()` before it's in the page, which gets its real width once you insert it. Words and characters don't depend on layout, so they're split once.
+
+When a play-once split finishes, it puts the element's own HTML back: the original text for assistive tech and copy and paste, and nothing left to split again. With `data-reveal-reverse` or `data-reveal-keep` the split stays, and a `lines` split keeps re-splitting.
+
+How the text reaches screen readers depends on what it's split into:
+
+- **`chars`** (`hidden` by default). One element per character is read letter by letter by some screen readers, so each word's pieces are hidden from assistive tech, with a visually hidden copy of the word in front of them. The element keeps its own role, and links keep their name and stay out of hidden content.
+- **`words` and `lines`** (`none` by default). The real words stay in the page and are read as they are.
+- **`auto`** is SplitText's own default: an `aria-label` on the element. That isn't allowed on a plain `<p>`, `<span>` or `<div>`, where screen readers then read nothing, so only choose it on a heading or an element with a role that can be named.
+
+Set `data-reveal-aria`, or `aria` in `typeDefaults.split`, to change it.
+
+With `hidden`, the copies are in the page for as long as the element is split: until its reveal finishes, and for good with `data-reveal-reverse` or `data-reveal-keep`. They can't be selected, so copy and paste gets each word once. The element's `textContent` has every word twice, though, and the browser's find in page can match a word's copy as well as the word.
+
+Splitting collapses white space, so line breaks that come from `white-space: pre-line` disappear while the element is split. Use `<br>` for line breaks in split text. Reduced motion doesn't split at all.
 
 ### `batch`
 Staggered reveal of many children as they enter together. Targets elements marked `data-reveal-item`, or falls back to direct children.

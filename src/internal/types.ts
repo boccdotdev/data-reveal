@@ -1,6 +1,8 @@
 export type Direction = "up" | "down" | "left" | "right";
 export type Axis = "x" | "y" | "z";
 export type SplitType = "chars" | "words" | "lines";
+/** How split text reaches assistive tech. See the `aria` option. */
+export type SplitAria = "auto" | "hidden" | "none";
 
 /**
  * Every option a reveal reads, named after its attribute without the
@@ -40,6 +42,14 @@ export interface RevealOptions {
   rotate?: number;
   /** `split`. */
   split?: SplitType;
+  /**
+   * How `split` text reaches assistive tech: `"hidden"` hides each piece and
+   * puts a visually hidden copy of its text in front of it, `"none"` leaves
+   * the pieces as they are, `"auto"` is SplitText's own aria-label on the
+   * element. Defaults to `"hidden"` for chars and `"none"` for words and
+   * lines.
+   */
+  aria?: SplitAria;
   /** Higher moves more (`parallax`). */
   speed?: number;
   /** Decimal places (`counter`). */

@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
-import { finishIfLast } from "../internal/finish.js";
+import { revealCallbacks } from "../internal/finish.js";
 import { option, options } from "../internal/options.js";
 import { ownTransform } from "../internal/transform.js";
 import { cleansUp, isReverse, revealStart } from "../internal/trigger.js";
@@ -30,21 +30,22 @@ export const init: RevealInit = (el, ctx) => {
   // built-in ones differ: an overshoot in, a plain ease out.
   const ease = option(el, ctx, "ease");
   const reverse = isReverse(el, ctx);
-  // Each item hands its props back as soon as its own reveal finishes.
-  const itemStagger = cleansUp(el, ctx)
-    ? {
-        each: stagger,
-        onComplete(this: gsap.core.Tween) {
-          finishIfLast(this, this.targets()[0] as HTMLElement);
-        },
-      }
-    : stagger;
+  // Callbacks per item, so each item hands its props back as soon as its own
+  // reveal finishes.
+  const itemStagger = { each: stagger, ...revealCallbacks(el, { cleanUp: cleansUp(el, ctx) }) };
+  // Every group's tween stays registered until it completes or `overwrite`
+  // interrupts it (its items entered or left again), so destroy() stops each
+  // group still animating.
+  const forget = function (this: gsap.core.Tween): void {
+    registry.forget(el, this);
+  };
+  const untilDone = { onComplete: forget, onInterrupt: forget };
 
   unhide(el);
   // Each item ends at its own opacity and position, read before it's hidden.
   targets.forEach((item) => registry.snapshot(el, item));
   const opacities = new Map(targets.map((item) => [item, shownOpacity(item)]));
-  const ownY = new Map(targets.map((item) => [item, ownTransform(item).y]));
+  const ownY = new Map(targets.map((item) => [item, ownTransform(item, el).y]));
   const shown = {
     opacity: (_index: number, item: HTMLElement) => opacities.get(item) ?? 1,
     y: (_index: number, item: HTMLElement) => ownY.get(item) ?? 0,
@@ -60,23 +61,27 @@ export const init: RevealInit = (el, ctx) => {
     start: revealStart(el, ctx),
     once: !reverse,
     onEnter: (group) => {
-      gsap.to(group, {
+      const tween = gsap.to(group, {
         ...shown,
         duration,
         stagger: itemStagger,
         ease: ease ?? "back.out(1.4)",
         overwrite: true,
+        ...untilDone,
       });
+      registry.track(el, tween);
     },
     onLeaveBack: reverse
       ? (group) => {
-          gsap.to(group, {
+          const tween = gsap.to(group, {
             ...hidden,
             duration,
-            stagger,
+            stagger: { each: stagger, ...revealCallbacks(el, { cleanUp: false }) },
             ease: ease ?? "power2.in",
             overwrite: true,
+            ...untilDone,
           });
+          registry.track(el, tween);
         }
       : undefined,
   });

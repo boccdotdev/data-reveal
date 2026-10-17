@@ -147,7 +147,7 @@ describe("snapshots", () => {
     expect(el("a").hasAttribute("style")).toBe(false);
   });
 
-  it("shares one snapshot between two reveals on an element, and puts it back when the last goes", async () => {
+  it("shares one snapshot between two reveals on an element", async () => {
     const { registry } = await loadCore();
     html(`<ul id="list"><li id="item"></li></ul>`);
     // batch arms first and hides its item, then the item's own fade arms.
@@ -158,12 +158,60 @@ describe("snapshots", () => {
     // The second reveal didn't record the first one's starting state.
     registry.restoreAnimated(el("item"));
     expect(el("item").hasAttribute("style")).toBe(false);
+  });
 
-    el("item").style.transform = "translate(0px, 20px)";
+  it("puts a shared snapshot back when no reveal is still animating the target", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.snapshot(el("list"), el("item"));
+    registry.snapshot(el("item"), el("item"));
+    // The item's own reveal is stopped partway; the batch has finished.
+    registry.started(el("item"), el("item"));
+    el("item").style.opacity = "0.1";
+
     registry.killElement(el("item"), { restore: "animated" });
-    expect(el("item").style.transform).toBe("translate(0px, 20px)");
-    registry.killElement(el("list"), { restore: "animated" });
     expect(el("item").hasAttribute("style")).toBe(false);
+  });
+
+  it("leaves a target that another reveal is still animating, to hand it back itself", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.snapshot(el("list"), el("item"));
+    registry.snapshot(el("item"), el("item"));
+    registry.started(el("list"), el("item"));
+    el("item").style.opacity = "0.1";
+
+    registry.killElement(el("item"), { restore: "animated" });
+    expect(el("item").style.opacity).toBe("0.1");
+    expect(registry.animating(el("item"))).toBe(true);
+    registry.stopped(el("list"), el("item"));
+    expect(registry.animating(el("item"))).toBe(false);
+  });
+
+  it("knows an element a reveal styled before, or one another reveal shares", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.snapshot(el("item"), el("item"));
+    expect(registry.styledBefore(el("item"))).toEqual({ rerun: false, shared: false });
+    registry.snapshot(el("list"), el("item"));
+    expect(registry.styledBefore(el("item"))).toEqual({ rerun: false, shared: true });
+
+    registry.killAll({ restore: "animated" });
+    registry.snapshot(el("item"), el("item"));
+    expect(registry.styledBefore(el("item"))).toEqual({ rerun: true, shared: false });
+  });
+
+  it("puts back the transform attributes GSAP sets on SVG elements", async () => {
+    const { registry } = await loadCore();
+    document.body.innerHTML = `<svg><rect id="rect"></rect></svg>`;
+    const rect = document.getElementById("rect") as unknown as HTMLElement;
+    registry.snapshot(rect, rect);
+    rect.setAttribute("transform", "matrix(0.5,0.5,-0.5,0.5,10,10)");
+    rect.setAttribute("data-svg-origin", "50 30");
+
+    registry.killAll({ restore: "animated" });
+    expect(rect.hasAttribute("transform")).toBe(false);
+    expect(rect.hasAttribute("data-svg-origin")).toBe(false);
   });
 
   it("restoreAnimated hands back only the animated props", async () => {

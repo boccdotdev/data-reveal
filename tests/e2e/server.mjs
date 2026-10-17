@@ -5,13 +5,15 @@
 //   /<faults>/dist/...               the built package (run `npm run build`)
 //   /<faults>/reveal.css             the stylesheet
 //   /<faults>/gsap/...               node_modules/gsap
+//   /<faults>/font/late.ttf          a font file, for fixtures that need one
+//                                    to finish loading late (delay=late:<ms>)
 //
 // <faults> is "-" for none, or a comma-separated list of `fail=<name>`,
 // `delay=<name>:<ms>` and `hang=<name>`. A fault applies to every file whose
 // name without its extension is <name>: "fade" matches dist/types/fade.js,
 // "ScrollTrigger" matches gsap/ScrollTrigger.js. Fixture pages build these
 // URLs with relative paths, so the faults carry over to everything they load.
-import { realpathSync } from "node:fs";
+import { readdirSync, realpathSync } from "node:fs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join, normalize, sep } from "node:path";
@@ -30,7 +32,24 @@ const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".ttf": "font/ttf",
 };
+
+// Any font will do: Playwright ships one (its icon font) in node_modules, so
+// the fixtures don't need a font file of their own.
+function findFont(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const found = findFont(path);
+      if (found) return found;
+    } else if (entry.name.endsWith(".ttf")) {
+      return path;
+    }
+  }
+  return null;
+}
+const font = findFont(join(root, "node_modules/playwright-core/lib"));
 
 function parseFaults(segment) {
   const faults = { fail: new Set(), hang: new Set(), delay: new Map() };
@@ -48,6 +67,7 @@ function parseFaults(segment) {
 
 function resolveFile(path) {
   if (path === "reveal.css") return join(root, "reveal.css");
+  if (path === "font/late.ttf") return font;
   const [mount, ...rest] = path.split("/");
   const base = mounts[mount];
   if (!base) return null;
@@ -80,7 +100,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const name = basename(file, extname(file));
+  const name = basename(match[2], extname(match[2]));
   if (faults.hang.has(name)) return; // never answer
   const delay = faults.delay.get(name);
   if (delay) await new Promise((resolve) => setTimeout(resolve, delay));

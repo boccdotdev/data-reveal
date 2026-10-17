@@ -41,4 +41,5 @@ export type {
   Direction,
   Axis,
   SplitType,
+  SplitAria,
 } from "./internal/types.js";

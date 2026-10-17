@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
-import { finishIfLast } from "../internal/finish.js";
+import { revealCallbacks } from "../internal/finish.js";
 import { options } from "../internal/options.js";
 import { cleansUp, revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
@@ -32,11 +32,7 @@ export const init: RevealInit = (el, ctx) => {
     delay,
     ease,
     scrollTrigger: revealTrigger(el, ctx),
-    onComplete: cleansUp(el, ctx)
-      ? function (this: gsap.core.Tween) {
-          finishIfLast(this, el);
-        }
-      : undefined,
+    ...revealCallbacks(el, { cleanUp: cleansUp(el, ctx) }),
   });
 
   registry.track(el, tween);
