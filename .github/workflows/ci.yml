@@ -7,6 +7,14 @@ on:
       - main
       - "release/**"
 
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run. Runs on branches finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     name: Node ${{ matrix.node }}
@@ -14,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v7
 
@@ -28,12 +36,15 @@ jobs:
       - run: npm run build
       - run: npm test
 
-      - run: npx playwright install --with-deps
-      - run: npx playwright test
+      # The browser tests don't depend on the Node version, so one leg runs them.
+      - if: matrix.node == 22
+        run: npx playwright install --with-deps
+      - if: matrix.node == 22
+        run: npx playwright test
 
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: failure() && matrix.node == 22
         with:
-          name: playwright-report-node-${{ matrix.node }}
+          name: playwright-report
           path: playwright-report/
           retention-days: 14

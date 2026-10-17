@@ -1,6 +1,6 @@
 import { createRevealCore } from "./createRevealCore.js";
 import type { RevealInstance } from "./createRevealCore.js";
-import type { RevealType, RevealInit } from "../internal/types.js";
+import type { RevealDefaults, RevealType, RevealInit } from "../internal/types.js";
 
 // Each entry is a separate dynamic import. Bundlers turn these into individual
 // chunks, so a type's code (and its GSAP plugin) is only fetched when an
@@ -23,15 +23,25 @@ const loaders: Record<RevealType, () => Promise<{ init: RevealInit }>> = {
   parallax: () => import("../types/parallax.js"),
 };
 
+/** Options for the auto entry's `createReveal()`. */
+export type CreateRevealOptions = RevealDefaults;
+
 /**
  * Auto mode: zero config. `init()` scans the DOM and lazily imports whichever
  * type modules are present. Convenient, but every type chunk ships in the
  * build. For minimal builds, use `@boccdotdev/data-reveal/manual`.
+ *
+ * ```ts
+ * createReveal({
+ *   defaults: { duration: 0.35, start: "top 75%" },
+ *   typeDefaults: { batch: { distance: 40, stagger: 0.08 } },
+ * }).init();
+ * ```
  */
-export function createReveal(): RevealInstance {
+export function createReveal(options: CreateRevealOptions = {}): RevealInstance {
   return createRevealCore(async (type) => {
     // Own keys only, so `data-reveal="valueOf"` isn't found on the prototype.
     if (!Object.prototype.hasOwnProperty.call(loaders, type)) return null;
     return (await loaders[type as RevealType]()).init;
-  });
+  }, options);
 }

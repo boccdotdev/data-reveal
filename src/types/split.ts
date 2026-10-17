@@ -3,22 +3,25 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
-import { num } from "../internal/attrs.js";
+import { options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
-import type { RevealInit, SplitType, RevealRegistration } from "../internal/types.js";
+import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
-export const init: RevealInit = (el, { reduced }) => {
-  if (reduced) {
+export const init: RevealInit = (el, ctx) => {
+  if (ctx.reduced) {
     unhide(el);
     return;
   }
 
-  const splitType = (el.dataset.revealSplit ?? "chars") as SplitType;
-  const stagger = num(el.dataset.revealStagger, 0.02);
-  const duration = num(el.dataset.revealDuration, 0.5);
-  const delay = num(el.dataset.revealDelay, 0);
+  const { split: splitType, stagger, duration, delay, ease } = options(el, ctx, {
+    split: "chars",
+    stagger: 0.02,
+    duration: 0.5,
+    delay: 0,
+    ease: "back.out(1.7)",
+  });
 
   // Splitting words alongside chars wraps each char in an inline-block word,
   // so a word wraps as a unit instead of breaking between letters.
@@ -36,8 +39,8 @@ export const init: RevealInit = (el, { reduced }) => {
     duration,
     stagger,
     delay,
-    ease: "back.out(1.7)",
-    scrollTrigger: revealTrigger(el),
+    ease,
+    scrollTrigger: revealTrigger(el, ctx),
   });
 
   registry.track(el, tween);

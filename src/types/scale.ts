@@ -1,31 +1,34 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
-import { num } from "../internal/attrs.js";
+import { options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
-export const init: RevealInit = (el, { reduced }) => {
-  if (reduced) {
+export const init: RevealInit = (el, ctx) => {
+  if (ctx.reduced) {
     gsap.set(el, { opacity: 1, scale: 1 });
     return;
   }
 
-  const fromScale = num(el.dataset.revealFrom, 0.92);
-  const duration = num(el.dataset.revealDuration, 0.5);
-  const delay = num(el.dataset.revealDelay, 0);
+  const { from, duration, delay, ease } = options(el, ctx, {
+    from: 0.92,
+    duration: 0.5,
+    delay: 0,
+    ease: "back.out(1.4)",
+  });
 
-  gsap.set(el, { opacity: 0, scale: fromScale });
+  gsap.set(el, { opacity: 0, scale: from });
 
   const tween = gsap.to(el, {
     opacity: 1,
     scale: 1,
     duration,
     delay,
-    ease: "back.out(1.4)",
-    scrollTrigger: revealTrigger(el),
+    ease,
+    scrollTrigger: revealTrigger(el, ctx),
   });
 
   registry.track(el, tween);

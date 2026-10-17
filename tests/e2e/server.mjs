@@ -11,12 +11,13 @@
 // name without its extension is <name>: "fade" matches dist/types/fade.js,
 // "ScrollTrigger" matches gsap/ScrollTrigger.js. Fixture pages build these
 // URLs with relative paths, so the faults carry over to everything they load.
+import { realpathSync } from "node:fs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = fileURLToPath(new URL("../..", import.meta.url));
+const root = realpathSync(fileURLToPath(new URL("../..", import.meta.url)));
 const port = Number(process.env.PORT ?? 4791);
 
 const mounts = {
@@ -56,9 +57,12 @@ function resolveFile(path) {
 }
 
 const server = createServer(async (req, res) => {
-  const { pathname } = new URL(req.url ?? "/", "http://localhost");
+  const { pathname, searchParams } = new URL(req.url ?? "/", "http://localhost");
   if (pathname === "/health") {
-    res.end("ok");
+    // Playwright passes its own checkout's root, so a server another checkout
+    // left on this port answers 409 instead of being silently reused.
+    const expected = searchParams.get("root");
+    res.writeHead(expected === null || expected === root ? 200 : 409).end(root);
     return;
   }
 

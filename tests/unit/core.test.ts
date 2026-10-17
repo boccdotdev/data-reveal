@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RevealInit } from "../../src/internal/types";
+import type { RevealDefaults, RevealInit } from "../../src/internal/types";
 import { deferred, el, fakeType, html, loadCore, settle, state } from "./helpers";
 
 const scrollTrigger = { refresh: vi.fn(), fail: false };
@@ -80,7 +80,7 @@ describe("init()", () => {
     html(`<div id="a" data-reveal="fade"></div>`);
 
     await reveal.init();
-    expect(init).toHaveBeenCalledWith(el("a"), { reduced: true });
+    expect(init).toHaveBeenCalledWith(el("a"), { reduced: true, defaults: {} });
   });
 
   it("arms each type as soon as it resolves", async () => {
@@ -170,6 +170,73 @@ describe("init()", () => {
     await fadeOnly.init();
     expect(state("a")).toBe("ready");
     expect(state("b")).toBe("ready");
+  });
+
+  it("hands each type the defaults with its own typeDefaults over them", async () => {
+    const { createRevealCore } = await loadCore();
+    const init = vi.fn<RevealInit>();
+    const reveal = createRevealCore(() => init, {
+      defaults: { duration: 1, ease: "power2.out" },
+      // An unset key doesn't hide the global value.
+      typeDefaults: { fade: { duration: 0.2, ease: undefined } },
+    });
+    html(`<div id="a" data-reveal="fade"></div><div id="b" data-reveal="scale"></div>`);
+
+    await reveal.init();
+    expect(init).toHaveBeenCalledWith(el("a"), { reduced: false, defaults: { duration: 0.2, ease: "power2.out" } });
+    expect(init).toHaveBeenCalledWith(el("b"), { reduced: false, defaults: { duration: 1, ease: "power2.out" } });
+  });
+
+  describe("global defaults a type would misread", () => {
+    const global = { start: "top 75%", end: "bottom 50%", duration: 0.35, stagger: 0.08 };
+
+    async function defaultsByType(typeDefaults?: RevealDefaults["typeDefaults"]) {
+      const { createRevealCore } = await loadCore();
+      const init = vi.fn<RevealInit>();
+      const reveal = createRevealCore(() => init, { defaults: global, typeDefaults });
+      html(`
+        <div id="fade" data-reveal="fade"></div>
+        <div id="parallax" data-reveal="parallax"></div>
+        <div id="counter" data-reveal="counter"></div>
+        <h2 id="split" data-reveal="split"></h2>
+      `);
+      await reveal.init();
+      return (id: string) => init.mock.calls.find(([target]) => target.id === id)?.[1].defaults;
+    }
+
+    it("are left out: start and end for parallax, duration for counter, stagger for split", async () => {
+      const defaultsOf = await defaultsByType();
+      expect(defaultsOf("fade")).toEqual(global);
+      expect(defaultsOf("parallax")).toEqual({ duration: 0.35, stagger: 0.08 });
+      expect(defaultsOf("counter")).toEqual({ start: "top 75%", end: "bottom 50%", stagger: 0.08 });
+      expect(defaultsOf("split")).toEqual({ start: "top 75%", end: "bottom 50%", duration: 0.35 });
+    });
+
+    it("still apply from typeDefaults", async () => {
+      const defaultsOf = await defaultsByType({
+        parallax: { start: "top 90%", end: "bottom 10%" },
+        counter: { duration: 2 },
+        split: { stagger: 0.01 },
+      });
+      expect(defaultsOf("parallax")).toMatchObject({ start: "top 90%", end: "bottom 10%" });
+      expect(defaultsOf("counter")).toMatchObject({ duration: 2 });
+      expect(defaultsOf("split")).toMatchObject({ stagger: 0.01 });
+    });
+  });
+
+  it("reads defaults and typeDefaults by the same rules as attributes", async () => {
+    const { createRevealCore } = await loadCore();
+    const init = vi.fn<RevealInit>();
+    // As they might arrive from JSON or a CMS field.
+    const loose = {
+      defaults: { start: "", reverse: "false", duration: "0.5", ease: 3, separator: "" },
+      typeDefaults: { fade: { to: "1,200", delay: "soon" } },
+    } as unknown as RevealDefaults;
+    const reveal = createRevealCore(() => init, loose);
+    html(`<div id="a" data-reveal="fade"></div>`);
+
+    await reveal.init();
+    expect(init.mock.calls[0][1].defaults).toEqual({ reverse: false, duration: 0.5, separator: "", to: 1200 });
   });
 
   it("includes the container itself (#10)", async () => {

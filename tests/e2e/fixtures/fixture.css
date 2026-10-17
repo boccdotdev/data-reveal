@@ -29,3 +29,26 @@ h2 {
   transition-property: opacity, transform;
   transition-duration: 300ms;
 }
+
+/* A site's own entrance animation on opacity. */
+.rises {
+  animation: rise 300ms;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Items side by side, so they share one top edge. */
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.row > * {
+  flex: 1;
+  margin: 0;
+}

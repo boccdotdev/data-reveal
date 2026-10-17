@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
-import { num } from "../internal/attrs.js";
+import { options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
@@ -17,16 +17,19 @@ const fromClip: Record<Direction, string> = {
   up: "inset(100% 0 0 0)",
 };
 
-export const init: RevealInit = (el, { reduced }) => {
-  if (reduced) {
+export const init: RevealInit = (el, ctx) => {
+  if (ctx.reduced) {
     gsap.set(el, { clipPath: "inset(0 0 0 0)" });
     unhide(el);
     return;
   }
 
-  const direction = (el.dataset.revealDirection ?? "up") as Direction;
-  const duration = num(el.dataset.revealDuration, 0.7);
-  const delay = num(el.dataset.revealDelay, 0);
+  const { direction, duration, delay, ease } = options(el, ctx, {
+    direction: "up",
+    duration: 0.7,
+    delay: 0,
+    ease: "power3.out",
+  });
 
   gsap.set(el, { clipPath: fromClip[direction] ?? fromClip.up });
   unhide(el);
@@ -35,8 +38,8 @@ export const init: RevealInit = (el, { reduced }) => {
     clipPath: "inset(0 0 0 0)",
     duration,
     delay,
-    ease: "power3.out",
-    scrollTrigger: revealTrigger(el),
+    ease,
+    scrollTrigger: revealTrigger(el, ctx),
   });
 
   registry.track(el, tween);

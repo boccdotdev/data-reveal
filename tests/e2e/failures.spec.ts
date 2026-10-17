@@ -1,8 +1,7 @@
-import { expect, test } from "@playwright/test";
-import { expectState, fixture, initResult } from "./helpers";
+import { expect, expectState, initResult, test } from "./helpers";
 
-test("a failed chunk leaves its element visible while other types animate", async ({ page }) => {
-  await page.goto(fixture("basic", { faults: { fail: ["fade"] } }));
+test("a failed chunk leaves its element visible while other types animate", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("basic", { faults: { fail: ["fade"] } }));
   expect(await initResult(page)).toMatch(/^rejected: /);
 
   await expectState(page.locator("#fade"), "failed");
@@ -12,23 +11,31 @@ test("a failed chunk leaves its element visible while other types animate", asyn
   await expectState(page.locator("#split"), "ready");
 });
 
-test("a slow chunk doesn't hold back other types", async ({ page }) => {
-  await page.goto(fixture("basic", { faults: { delay: { split: 2_000 } } }));
+test("a slow chunk doesn't hold back other types", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("basic", { faults: { delay: { split: 5_000 } } }));
 
   await expectState(page.locator("#fade"), "ready");
   await expect(page.locator("#fade")).toHaveCSS("opacity", "1");
   await expectState(page.locator("#split"), null);
   expect(await page.evaluate(() => window.__reveal.settled)).toBe(false);
 
-  await expectState(page.locator("#split"), "ready");
+  await expect(page.locator("#split")).toHaveAttribute("data-reveal-state", "ready", { timeout: 10_000 });
   expect(await initResult(page)).toBe("resolved");
 });
 
-test("manual mode skips a type that isn't registered, and shows it", async ({ page }) => {
-  await page.goto(fixture("basic", { params: { mode: "manual", types: "fade" } }));
+test("manual mode skips a type that isn't registered, and shows it", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("basic", { params: { mode: "manual", types: "fade" } }));
   expect(await initResult(page)).toBe("resolved");
 
   await expectState(page.locator("#fade"), "ready");
   await expectState(page.locator("#scale"), "skipped");
   await expect(page.locator("#scale")).toHaveCSS("opacity", "1");
+});
+
+test("if the package itself fails to load, the failsafe shows content", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("basic", { faults: { fail: ["index"] }, params: { failsafe: "300ms" } }));
+  expect(await initResult(page)).toMatch(/^failed to load: /);
+
+  await expectState(page.locator("#fade"), null);
+  await expect(page.locator("#fade")).toHaveCSS("opacity", "1");
 });

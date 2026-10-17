@@ -1,7 +1,8 @@
 import { prefersReducedMotion } from "./reducedMotion.js";
 import { registry } from "./registry.js";
 import { unhide } from "./visibility.js";
-import type { RevealInit } from "../internal/types.js";
+import { parseOptions } from "../internal/options.js";
+import type { RevealDefaults, RevealInit, RevealOptions, RevealType } from "../internal/types.js";
 
 // Maps a `data-reveal` type string to its init, or null if the type isn't
 // available. The auto entry resolves via dynamic import (async); the manual
@@ -52,6 +53,17 @@ interface Scan {
   reduced: boolean;
 }
 
+// Global defaults a type ignores, because the key means something else to it.
+// A global `start` places a one-shot reveal's trigger, not a parallax range.
+// A global `duration` sized for reveals would rush a count. A global
+// `stagger` is per item, not per character. These still apply when set in
+// `typeDefaults` or as an attribute.
+const globalsIgnored = new Map<string, Array<keyof RevealOptions>>([
+  ["parallax", ["start", "end"]],
+  ["counter", ["duration"]],
+  ["split", ["stagger"]],
+]);
+
 export interface RevealInstance {
   /**
    * Scan the container (and the container itself, if it has `data-reveal`)
@@ -84,13 +96,30 @@ export interface RevealInstance {
 /**
  * Builds a RevealInstance around a type resolver. The auto and manual entries
  * differ only in how they resolve a type to its init — everything else (the
- * idempotent scan, refresh coalescing, scoped teardown) is shared here.
+ * idempotent scan, option defaults, refresh coalescing, scoped teardown) is
+ * shared here.
  */
-export function createRevealCore(resolve: RevealResolver): RevealInstance {
+export function createRevealCore(
+  resolve: RevealResolver,
+  { defaults, typeDefaults }: RevealDefaults = {},
+): RevealInstance {
   // Elements already claimed by an init() call, so init() is safe to call
   // repeatedly as the DOM grows (e.g. infinite scroll) without re-animating
   // existing elements.
   let claims = new WeakMap<Element, object>();
+
+  // The defaults a type's init gets: its own typeDefaults over the global
+  // ones it doesn't ignore, both read by the same rules as attributes, so an
+  // unset or unreadable value doesn't hide the one below it.
+  function defaultsFor(type: string): RevealOptions {
+    const global = parseOptions(defaults);
+    for (const key of globalsIgnored.get(type) ?? []) delete global[key];
+    const own =
+      typeDefaults && Object.prototype.hasOwnProperty.call(typeDefaults, type)
+        ? typeDefaults[type as RevealType]
+        : undefined;
+    return { ...global, ...parseOptions(own) };
+  }
 
   // Resolve one type and run it on its elements. Resolves with the errors
   // rather than rejecting, so init() can let every type settle first.
@@ -112,6 +141,7 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
       unhide(el);
     };
 
+    const ctx = { reduced: scan.reduced, defaults: defaultsFor(type) };
     let armed = false;
     for (const el of elements) {
       // destroy() ran, or a later init() took the element over, meanwhile.
@@ -138,7 +168,7 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
       setState(el, "ready");
       const style = el.getAttribute("style");
       try {
-        init(el, { reduced: scan.reduced });
+        init(el, ctx);
         armed = true;
       } catch (error) {
         errors.push(error);

@@ -64,7 +64,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
     "test:all": "npm test && npm run test:e2e",
@@ -92,12 +92,13 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
+    "@types/node": "^22.20.5",
     "gsap": "^3.13.0",
     "happy-dom": "^21.0.3",
     "postcss": "^8.5.30",
-    "postcss-import": "^16.2.0",
+    "postcss-import": "^17.0.1",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.1.12"
+    "vitest": "^5.0.5"
   }
 }

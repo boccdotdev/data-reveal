@@ -1,9 +1,8 @@
-import { expect, test } from "@playwright/test";
-import { clipInsets, expectState, fixture, initResult, opacities, scrollTo } from "./helpers";
+import { documentTop, expect, expectState, initResult, isClipped, opacities, scrollTo, test } from "./helpers";
 
 test.describe("every built-in type", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(fixture("types"));
+  test.beforeEach(async ({ page, fixtureUrl }) => {
+    await page.goto(fixtureUrl("types"));
     expect(await initResult(page)).toBe("resolved");
   });
 
@@ -43,10 +42,10 @@ test.describe("every built-in type", () => {
   test("clip wipes in once scrolled to", async ({ page }) => {
     const target = page.locator("#clip");
     await expectState(target, "ready");
-    expect(await clipInsets(target)).not.toEqual([0]);
+    expect(await isClipped(target)).toBe(true);
 
     await scrollTo(target);
-    await expect.poll(() => clipInsets(target)).toEqual([0]);
+    await expect.poll(() => isClipped(target)).toBe(false);
     await expect(target).toHaveCSS("opacity", "1");
   });
 
@@ -62,13 +61,12 @@ test.describe("every built-in type", () => {
 
   test("parallax moves with the scroll and stays visible", async ({ page }) => {
     const target = page.locator("#parallax");
-    const transform = () => target.evaluate((element) => getComputedStyle(element).transform);
     await expectState(target, "ready");
 
     await scrollTo(target);
-    const before = await transform();
+    const before = await documentTop(target);
     await page.evaluate(() => window.scrollBy(0, 200));
-    await expect.poll(transform).not.toBe(before);
+    await expect.poll(async () => Math.abs((await documentTop(target)) - before)).toBeGreaterThan(5);
     await expect(target).toHaveCSS("opacity", "1");
   });
 });

@@ -138,6 +138,55 @@ With no argument, kills all tweens + ScrollTriggers, reverts SplitText, and forg
 
 `destroy()` also covers an `init()` that is still loading types. That call skips the elements you destroyed, so `init(); destroy(); init()` arms each element once. An element removed from the page while its type loads isn't armed either, and a later `init()` picks it up if it comes back. A subtree that was never on the page, such as a card you call `init(card)` on just before inserting it, is armed as usual.
 
+## Defaults
+
+Set house values once instead of repeating attributes on every element. Both entries take the same options:
+
+```ts
+createReveal({
+  defaults: { duration: 0.35, start: "top 75%", ease: "power3.out" },
+  typeDefaults: {
+    batch: { distance: 40, stagger: 0.08, start: "top 88%" },
+    scale: { from: 0.8 },
+  },
+});
+
+// Manual mode
+createReveal({ types: [fade, batch], defaults: { duration: 0.35 } });
+```
+
+Each option is named after its attribute without the `data-reveal-` prefix, so `data-reveal-duration` is `duration`, and takes the same values. For each option, a reveal uses the first of:
+
+1. the attribute on the element
+2. `typeDefaults` for its type
+3. `defaults`
+4. the type's built-in value
+
+A global default applies to every type that reads the option, with three exceptions where the option means something else to the type: `parallax` ignores a global `start` and `end`, which would shrink its scroll range; `counter` ignores a global `duration`, which would rush the count; and `split` ignores a global `stagger`, which is per character there. They still apply when set in `typeDefaults` or as an attribute.
+
+| Option | Read by |
+|--------|---------|
+| `duration` | every type but `parallax` (`counter` ignores a global one) |
+| `delay` | `fade`, `scale`, `split`, `blur`, `clip`, `rotate`, `slide` |
+| `start` | every type (`parallax` ignores a global one) |
+| `end` | `parallax` (ignores a global one) |
+| `ease`, `reverse` | every type but `parallax` |
+| `distance` | `fade`, `batch` |
+| `stagger` | `split` (ignores a global one), `batch` |
+| `direction` | `fade`, `clip`, `slide` |
+| `from` | `scale` (starting scale), `counter` (starting number) |
+| `to`, `decimals`, `separator`, `prefix`, `suffix` | `counter` |
+| `blur` | `blur` |
+| `axis`, `rotate` | `rotate` |
+| `split` | `split` |
+| `speed` | `parallax` |
+
+Since `from` means a different thing to each type that reads it, set it in `typeDefaults` rather than `defaults`.
+
+Values in `defaults` and `typeDefaults` are read the same way as attributes, so `"0.5"` works for a duration, `"false"` turns `reverse` off, and an empty `start` counts as unset.
+
+Both entries export the option types: `CreateRevealOptions`, `RevealOptions` and `RevealTypeDefaults`.
+
 ## Animation types
 
 All types accept these shared attributes:
@@ -146,8 +195,13 @@ All types accept these shared attributes:
 |-----------|---------|-------|
 | `data-reveal-duration` | varies | Seconds |
 | `data-reveal-delay` | `0` | Seconds |
-| `data-reveal-start` | `top 85%` | ScrollTrigger `start` position |
+| `data-reveal-start` | `top 85%` | ScrollTrigger `start` position. See below for content near the end of the page. |
+| `data-reveal-ease` | varies | Any GSAP ease, e.g. `power2.out`. Each type has its own built-in ease. (`parallax` is scrubbed and ignores this.) |
 | `data-reveal-reverse` | off | Add it to play the animation out again when scrolling back up past `start`. Default is play-once. (`parallax` is always bidirectional and ignores this.) |
+
+An element near the end of the page, such as one in the footer, may never scroll as far up as `top 85%`. With the built-in start it still plays: once the page is scrolled to the bottom, or straight away on a page too short to scroll. The start is measured against the element's scroller, so this holds inside a scrolling container set with `ScrollTrigger.defaults({ scroller })` too. A start you set yourself is used exactly as given. To get the same for it, wrap it in `clamp()` too, as in `data-reveal-start="clamp(top 75%)"`. Keep that to content below the fold: `clamp()` also holds back content that's in view when the page loads until the first scroll.
+
+Without an ease of your own, each type keeps the one it has always had, whatever `gsap.defaults()` says.
 
 ### `fade`
 Fade + translate in.
@@ -179,6 +233,8 @@ Staggered reveal of many children as they enter together. Targets elements marke
 |-----------|---------|-------|
 | `data-reveal-stagger` | `0.06` | Seconds |
 | `data-reveal-distance` | `20` | px |
+
+With `data-reveal-reverse`, items ease out with `power2.in`. An ease you set applies both ways.
 
 ```html
 <ul data-reveal="batch">
@@ -229,7 +285,7 @@ Count a number up as it enters view. Reads the target from `data-reveal-to`, or 
 | `data-reveal-suffix` | — | e.g. `%` |
 
 ### `parallax`
-Continuous, scroll-linked motion (scrubbed — not a one-shot reveal). Disabled under reduced motion.
+Continuous, scroll-linked motion (scrubbed — not a one-shot reveal). Disabled under reduced motion. It moves in step with the scroll, so it ignores `data-reveal-ease`, and its start isn't clamped.
 
 | Attribute | Default | Notes |
 |-----------|---------|-------|
@@ -242,12 +298,13 @@ Continuous, scroll-linked motion (scrubbed — not a one-shot reveal). Disabled 
 ```bash
 npm install
 npx playwright install   # browsers for the end-to-end tests, once
+npm run typecheck        # the library, then the tests and configs
 npm test                 # unit tests: Vitest with happy-dom
 npm run test:e2e         # build, then Playwright in Chromium, Firefox and WebKit
 npm run test:all         # both
 ```
 
-The unit tests in `tests/unit` cover the core and the registry with stand-in types. The end-to-end tests in `tests/e2e` load fixture pages from a small local server that can fail, delay or hold back any file, to act out a broken deploy or a slow network. GSAP comes from `node_modules`, so the tests don't need the internet. To run one browser, use `npx playwright test --project=chromium`.
+The unit tests in `tests/unit` cover the core and the registry with stand-in types. The end-to-end tests in `tests/e2e` load fixture pages from a small local server that can fail, delay or hold back any file, to act out a broken deploy or a slow network. GSAP comes from `node_modules`, so the tests don't need the internet. To run one browser, use `npx playwright test --project=chromium`. The fixture server listens on port 4791. Set `E2E_PORT` to run a second checkout's tests at the same time.
 
 ## License
 

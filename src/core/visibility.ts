@@ -8,15 +8,20 @@ export function unhide(el: HTMLElement): void {
   if (restingOpacity(el) === "0") el.style.opacity = "1";
 }
 
-// The opacity the element settles at. When `reveal.css` lets go of an element
-// with `transition: opacity`, getComputedStyle reads the transition's start
-// value, so take its end value instead. getAnimations() flushes pending style
-// changes, so a transition the state change just started is already listed.
-function restingOpacity(el: HTMLElement): string {
-  const transition = el
-    .getAnimations?.()
-    .find((animation) => (animation as CSSTransition).transitionProperty === "opacity");
-  const frames = (transition?.effect as KeyframeEffect | null | undefined)?.getKeyframes();
-  const end = frames?.[frames.length - 1]?.opacity;
+// The opacity the element settles at, or null while an animation of the
+// site's own (a CSS `animation`, say) is driving it: that animation decides
+// where the element ends up, so it's left alone. getAnimations() flushes
+// pending style changes, so an animation or transition the state change just
+// started is already listed.
+function restingOpacity(el: HTMLElement): string | null {
+  let end: unknown;
+  for (const animation of el.getAnimations?.() ?? []) {
+    const frames = (animation.effect as KeyframeEffect | null)?.getKeyframes() ?? [];
+    if (!frames.some((frame) => frame.opacity != null)) continue;
+    // A transition on opacity, e.g. when `reveal.css` lets go of an element
+    // with `transition: opacity`, reads as its start value, so take its end.
+    if ((animation as CSSTransition).transitionProperty !== "opacity") return null;
+    end = frames[frames.length - 1].opacity;
+  }
   return end == null ? getComputedStyle(el).opacity : String(end);
 }

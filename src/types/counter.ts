@@ -2,21 +2,24 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
-import { num } from "../internal/attrs.js";
+import { option, options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
-export const init: RevealInit = (el, { reduced }) => {
-  const raw = el.dataset.revealTo ?? el.textContent ?? "0";
-  const to = parseFloat(raw.replace(/[^0-9.\-]/g, "")) || 0;
-  const from = num(el.dataset.revealFrom, 0);
-  const duration = num(el.dataset.revealDuration, 1.5);
-  const decimals = num(el.dataset.revealDecimals, 0);
-  const separator = el.dataset.revealSeparator;
-  const prefix = el.dataset.revealPrefix ?? "";
-  const suffix = el.dataset.revealSuffix ?? "";
+export const init: RevealInit = (el, ctx) => {
+  // Without a `to`, count up to the number the element already shows.
+  const to = option(el, ctx, "to") ?? (parseFloat((el.textContent ?? "").replace(/[^0-9.\-]/g, "")) || 0);
+  const { from, duration, decimals, separator, prefix, suffix, ease } = options(el, ctx, {
+    from: 0,
+    duration: 1.5,
+    decimals: 0,
+    separator: "",
+    prefix: "",
+    suffix: "",
+    ease: "power1.out",
+  });
 
   const format = (value: number): string => {
     const fixed = value.toFixed(decimals);
@@ -29,7 +32,7 @@ export const init: RevealInit = (el, { reduced }) => {
   // The count is the animation, so the element itself shows straight away.
   unhide(el);
 
-  if (reduced) {
+  if (ctx.reduced) {
     el.textContent = format(to);
     return;
   }
@@ -40,11 +43,11 @@ export const init: RevealInit = (el, { reduced }) => {
   const tween = gsap.to(counter, {
     value: to,
     duration,
-    ease: "power1.out",
+    ease,
     onUpdate: () => {
       el.textContent = format(counter.value);
     },
-    scrollTrigger: revealTrigger(el),
+    scrollTrigger: revealTrigger(el, ctx),
   });
 
   registry.track(el, tween);

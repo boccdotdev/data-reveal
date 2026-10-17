@@ -1,8 +1,7 @@
-import { expect, test } from "@playwright/test";
-import { expectState, fixture, initResult } from "./helpers";
+import { expect, expectState, initResult, test } from "./helpers";
 
-test("init() on a card before it's inserted reveals it once inserted", async ({ page }) => {
-  await page.goto(fixture("basic"));
+test("init() on a card before it's inserted reveals it once inserted", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("basic"));
   expect(await initResult(page)).toBe("resolved");
 
   await page.evaluate(async () => {
@@ -19,8 +18,8 @@ test("init() on a card before it's inserted reveals it once inserted", async ({ 
   await expect(page.locator("#card")).toHaveCSS("opacity", "1");
 });
 
-test("a later init() doesn't wait for a chunk that never arrives", async ({ page }) => {
-  await page.goto(fixture("basic", { faults: { hang: ["split"] } }));
+test("a later init() doesn't wait for a chunk that never arrives", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("basic", { faults: { hang: ["split"] } }));
   await expectState(page.locator("#fade"), "ready");
   await expectState(page.locator("#split"), null);
 

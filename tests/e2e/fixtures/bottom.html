@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>End of the page</title>
+</head>
+<body>
+  <p>The row at the bottom can't scroll up to 85% of the viewport.</p>
+  <div class="gap"></div>
+  <div class="row">
+    <div id="fade" class="box" data-reveal="fade" data-reveal-duration="0.2">fade</div>
+    <ul id="batch" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+      <li data-reveal-item>batch</li>
+    </ul>
+    <div id="explicit" class="box" data-reveal="fade" data-reveal-duration="0.2" data-reveal-start="top 85%">explicit start</div>
+  </div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

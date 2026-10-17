@@ -1,22 +1,25 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
-import { num } from "../internal/attrs.js";
+import { options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
-import type { RevealInit, Axis, RevealRegistration } from "../internal/types.js";
+import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
-export const init: RevealInit = (el, { reduced }) => {
-  if (reduced) {
+export const init: RevealInit = (el, ctx) => {
+  if (ctx.reduced) {
     gsap.set(el, { opacity: 1, rotationX: 0, rotationY: 0, rotation: 0 });
     return;
   }
 
-  const axis = (el.dataset.revealAxis ?? "x") as Axis;
-  const amount = num(el.dataset.revealRotate, 90);
-  const duration = num(el.dataset.revealDuration, 0.7);
-  const delay = num(el.dataset.revealDelay, 0);
+  const { axis, rotate: amount, duration, delay, ease } = options(el, ctx, {
+    axis: "x",
+    rotate: 90,
+    duration: 0.7,
+    delay: 0,
+    ease: "power3.out",
+  });
 
   const fromVars: Record<string, number> = { opacity: 0, transformPerspective: 800 };
   const toRotation: Record<string, number> = {};
@@ -38,8 +41,8 @@ export const init: RevealInit = (el, { reduced }) => {
     ...toRotation,
     duration,
     delay,
-    ease: "power3.out",
-    scrollTrigger: revealTrigger(el),
+    ease,
+    scrollTrigger: revealTrigger(el, ctx),
   });
 
   registry.track(el, tween);

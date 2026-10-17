@@ -17,6 +17,12 @@ function transitioning(target: HTMLElement, from: string, to: string): void {
   target.getAnimations = () => [transition as unknown as Animation];
 }
 
+// Stands in for a CSS animation of the site's own on the element.
+function animating(target: HTMLElement, frames: Keyframe[]): void {
+  const animation = { animationName: "site", effect: { getKeyframes: () => frames } };
+  target.getAnimations = () => [animation as unknown as Animation];
+}
+
 describe("unhide()", () => {
   it("shows an element that computes to opacity 0", () => {
     html(`<div id="a" class="hidden"></div>`);
@@ -42,5 +48,21 @@ describe("unhide()", () => {
     unhide(el("hidden"));
     expect(el("muted").style.opacity).toBe("");
     expect(el("hidden").style.opacity).toBe("1");
+  });
+
+  it("leaves an element alone while a site's own animation drives its opacity", () => {
+    html(`<div id="a" class="hidden"></div>`);
+    animating(el("a"), [{ opacity: "0" }, { opacity: "0.6" }]);
+
+    unhide(el("a"));
+    expect(el("a").style.opacity).toBe("");
+  });
+
+  it("ignores animations that don't touch opacity", () => {
+    html(`<div id="a" class="hidden"></div>`);
+    animating(el("a"), [{ transform: "translateY(20px)" }, { transform: "none" }]);
+
+    unhide(el("a"));
+    expect(el("a").style.opacity).toBe("1");
   });
 });
