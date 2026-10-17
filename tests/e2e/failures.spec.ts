@@ -1,4 +1,4 @@
-import { expect, expectState, initResult, test } from "./helpers";
+import { expect, expectArmed, expectState, initResult, test } from "./helpers";
 
 test("a failed chunk leaves its element visible while other types animate", async ({ page, fixtureUrl }) => {
   await page.goto(fixtureUrl("basic", { faults: { fail: ["fade"] } }));
@@ -6,20 +6,20 @@ test("a failed chunk leaves its element visible while other types animate", asyn
 
   await expectState(page.locator("#fade"), "failed");
   await expect(page.locator("#fade")).toHaveCSS("opacity", "1");
-  await expectState(page.locator("#scale"), "ready");
+  await expectArmed(page.locator("#scale"));
   await expect(page.locator("#scale")).toHaveCSS("opacity", "1");
-  await expectState(page.locator("#split"), "ready");
+  await expectArmed(page.locator("#split"));
 });
 
 test("a slow chunk doesn't hold back other types", async ({ page, fixtureUrl }) => {
   await page.goto(fixtureUrl("basic", { faults: { delay: { split: 5_000 } } }));
 
-  await expectState(page.locator("#fade"), "ready");
+  await expectArmed(page.locator("#fade"));
   await expect(page.locator("#fade")).toHaveCSS("opacity", "1");
   await expectState(page.locator("#split"), null);
   expect(await page.evaluate(() => window.__reveal.settled)).toBe(false);
 
-  await expect(page.locator("#split")).toHaveAttribute("data-reveal-state", "ready", { timeout: 10_000 });
+  await expectArmed(page.locator("#split"), 10_000);
   expect(await initResult(page)).toBe("resolved");
 });
 
@@ -27,7 +27,7 @@ test("manual mode skips a type that isn't registered, and shows it", async ({ pa
   await page.goto(fixtureUrl("basic", { params: { mode: "manual", types: "fade" } }));
   expect(await initResult(page)).toBe("resolved");
 
-  await expectState(page.locator("#fade"), "ready");
+  await expectArmed(page.locator("#fade"));
   await expectState(page.locator("#scale"), "skipped");
   await expect(page.locator("#scale")).toHaveCSS("opacity", "1");
 });

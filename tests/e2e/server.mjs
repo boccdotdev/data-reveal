@@ -3,6 +3,9 @@
 //
 //   /<faults>/fixtures/<page>.html   a fixture page
 //   /<faults>/dist/...               the built package (run `npm run build`)
+//   /<faults>/dist-copy/...          the same files at another URL, which the
+//                                    browser loads as a second copy, as it
+//                                    would a separately bundled script
 //   /<faults>/reveal.css             the stylesheet
 //   /<faults>/gsap/...               node_modules/gsap
 //   /<faults>/font/late.ttf          a font file, for fixtures that need one
@@ -25,6 +28,7 @@ const port = Number(process.env.PORT ?? 4791);
 const mounts = {
   fixtures: join(root, "tests/e2e/fixtures"),
   dist: join(root, "dist"),
+  "dist-copy": join(root, "dist"),
   gsap: join(root, "node_modules/gsap"),
 };
 

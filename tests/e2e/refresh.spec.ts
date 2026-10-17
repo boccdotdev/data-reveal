@@ -36,3 +36,26 @@ test.describe("a smooth scroll in progress", () => {
     expect(Math.abs((await scrollSettled(page)) - target)).toBeLessThanOrEqual(20);
   });
 });
+
+test.describe("refresh()", () => {
+  test("resolves once the positions have been worked out again", async ({ page, fixtureUrl }) => {
+    await page.goto(fixtureUrl("types"));
+    expect(await initResult(page)).toBe("resolved");
+    await page.waitForFunction(() => window.__reveal.refreshes > 0);
+
+    const ran = await page.evaluate(async () => {
+      const before = window.__reveal.refreshes;
+      await window.__reveal.instance?.refresh();
+      return window.__reveal.refreshes - before;
+    });
+    expect(ran).toBe(1);
+  });
+
+  test("resolves on a page with nothing to refresh", async ({ page, fixtureUrl }) => {
+    await page.goto(fixtureUrl("types", { params: { init: "0" } }));
+    await page.waitForFunction(() => window.__reveal?.instance != null);
+
+    await page.evaluate(() => window.__reveal.instance?.refresh());
+    expect(await page.evaluate(() => window.__reveal.refreshes)).toBe(0);
+  });
+});

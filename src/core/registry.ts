@@ -36,7 +36,15 @@ interface Entry {
   killables: Killable[];
   revertables: Revertable[];
   snapshots: Snapshot[];
+  // The reveal has finished and handed everything back. It's dropped once
+  // every reveal it shares a snapshot with has too.
+  finished: boolean;
 }
+
+// Which entries a kill applies to, by the element each reveal is on: the
+// core passes the ones its own instance armed.
+type Owned = (el: Element) => boolean;
+const everything: Owned = () => true;
 
 // The props the built-in types animate or set while animating. GSAP writes
 // the individual `translate`, `rotate` and `scale` props alongside `transform`.
@@ -57,7 +65,8 @@ const svgAttributes = ["transform", "data-svg-origin"];
 type Restore = "none" | "animated" | "style";
 
 class RevealRegistry {
-  private entries: Entry[] = [];
+  // One entry per element a reveal is on, in the order they were armed.
+  private entries = new Map<Element, Entry>();
   // The live snapshot of each target, for sharing and for finish().
   private snapshotOf = new WeakMap<HTMLElement, Snapshot>();
   // Every target a reveal has snapshotted, so a later run knows it's one.
@@ -68,12 +77,17 @@ class RevealRegistry {
   private running = new WeakMap<HTMLElement, Set<Element>>();
 
   private entryFor(el: Element): Entry {
-    let entry = this.entries.find((e) => e.el === el);
+    let entry = this.entries.get(el);
     if (!entry) {
-      entry = { el, killables: [], revertables: [], snapshots: [] };
-      this.entries.push(entry);
+      entry = { el, killables: [], revertables: [], snapshots: [], finished: false };
+      this.entries.set(el, entry);
     }
     return entry;
+  }
+
+  /** How many reveals the registry holds. For tests. */
+  get size(): number {
+    return this.entries.size;
   }
 
   add(el: Element, trigger: Killable): void {
@@ -153,9 +167,40 @@ class RevealRegistry {
 
   /** Drop a tween the registry no longer needs to kill, e.g. one a re-split replaced. */
   forget(el: Element, tween: Trackable): void {
-    const entry = this.entries.find((e) => e.el === el);
+    const entry = this.entries.get(el);
     if (!entry) return;
     entry.killables = entry.killables.filter((k) => k !== tween && k !== tween.scrollTrigger);
+  }
+
+  /**
+   * The play-once reveal on `el` has finished and handed its props back, so
+   * nothing is left to undo: kill what it registered (a spent trigger, the
+   * finished tween) and drop its entry. A reveal that shares a snapshot with
+   * one still to finish (a batch item that is also a fade) waits for it, and
+   * they're dropped together.
+   */
+  release(el: Element): void {
+    const entry = this.entries.get(el);
+    if (!entry) return;
+    entry.finished = true;
+    const group = new Set<Entry>();
+    const pending = [entry];
+    for (let next = pending.pop(); next; next = pending.pop()) {
+      if (group.has(next)) continue;
+      if (!next.finished) return;
+      group.add(next);
+      for (const snapshot of next.snapshots) {
+        for (const owner of snapshot.owners) {
+          const other = this.entries.get(owner);
+          if (other) pending.push(other);
+        }
+      }
+    }
+    for (const done of group) {
+      this.entries.delete(done.el);
+      done.killables.forEach((k) => k.kill());
+      for (const snapshot of done.snapshots) snapshot.owners.delete(done.el);
+    }
   }
 
   /**
@@ -190,39 +235,38 @@ class RevealRegistry {
   // puts a snapshot back once no reveal is animating its target any more:
   // "animated" puts back only the animated props (and text), keeping any
   // other inline styles a site set since init(); "style" puts back the whole
-  // style attribute.
-  killAll({ restore = "none" }: { restore?: Restore } = {}): Element[] {
-    const killed = this.entries;
-    killed.forEach((entry) => this.killEntry(entry, restore));
-    this.entries = [];
-    return killed.map((entry) => entry.el);
+  // style attribute. `owned` limits it to the reveals on the elements it
+  // accepts.
+  killAll({ restore = "none", owned = everything }: { restore?: Restore; owned?: Owned } = {}): Element[] {
+    return this.killWhere(owned, restore);
   }
 
   // Kill only the entries whose element is the container or lives inside it.
   // `contains` works on detached subtrees too, so a removed-then-destroyed
   // container is still cleaned up.
-  kill(container: ParentNode, { restore = "none" }: { restore?: Restore } = {}): Element[] {
-    const remaining: Entry[] = [];
-    const killed: Element[] = [];
-    for (const entry of this.entries) {
-      if (entry.el === container || (container as Node).contains(entry.el)) {
-        this.killEntry(entry, restore);
-        killed.push(entry.el);
-      } else {
-        remaining.push(entry);
-      }
-    }
-    this.entries = remaining;
-    return killed;
+  kill(
+    container: ParentNode,
+    { restore = "none", owned = everything }: { restore?: Restore; owned?: Owned } = {},
+  ): Element[] {
+    return this.killWhere((el) => (el === container || (container as Node).contains(el)) && owned(el), restore);
   }
 
   // Kill only what is registered to this exact element. Unlike kill(el), it
   // leaves reveals nested inside the element running.
   killElement(el: Element, { restore = "none" }: { restore?: Restore } = {}): void {
-    const entry = this.entries.find((e) => e.el === el);
+    const entry = this.entries.get(el);
     if (!entry) return;
+    this.entries.delete(el);
     this.killEntry(entry, restore);
-    this.entries = this.entries.filter((e) => e !== entry);
+  }
+
+  private killWhere(match: Owned, restore: Restore): Element[] {
+    const killed = Array.from(this.entries.values()).filter((entry) => match(entry.el));
+    // Out of the registry first, so a callback a kill sets off (a tween's
+    // onInterrupt) finds nothing to change.
+    killed.forEach((entry) => this.entries.delete(entry.el));
+    killed.forEach((entry) => this.killEntry(entry, restore));
+    return killed.map((entry) => entry.el);
   }
 
   // Stop the animations first so nothing writes to the element afterwards,

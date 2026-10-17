@@ -1,4 +1,4 @@
-import { allTypes, expect, expectState, initResult, scrollTo, test } from "./helpers";
+import { allTypes, expect, expectArmed, expectState, initResult, scrollTo, test } from "./helpers";
 
 test("types that don't animate their own opacity keep the element's", async ({ page, fixtureUrl }) => {
   await page.goto(fixtureUrl("opacity"));
@@ -6,7 +6,7 @@ test("types that don't animate their own opacity keep the element's", async ({ p
 
   for (const id of ["counter", "parallax", "clip", "split", "batch"]) {
     const target = page.locator(`#${id}`);
-    await expectState(target, "ready");
+    await expectArmed(target);
     await expect(target).toHaveCSS("opacity", "0.6");
   }
 });

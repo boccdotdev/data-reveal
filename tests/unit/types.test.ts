@@ -176,18 +176,19 @@ describe.each(oneShot)("%s when it finishes", (name, init) => {
     expect(complete("").style.cssText).toBe("color: red;");
   });
 
-  // Finishes on a target with GSAP's cache, then destroys it, and reports
-  // whether each one told GSAP to read the transform afresh.
+  // With `css` on the target, reports whether finishing the reveal, and
+  // destroy() before it plays, told GSAP to read the transform afresh.
   function uncachedBy(css: string): { finish?: number; destroy?: number } {
+    type Cached = HTMLElement & { _gsap: { uncache?: number } };
     document.head.innerHTML = `<style>#target { ${css} }</style>`;
-    const target = complete("", {}, (target) => Object.assign(target, { _gsap: {} })) as unknown as {
-      _gsap: { uncache?: number };
-    };
-    document.head.innerHTML = "";
-    const finish = target._gsap.uncache;
-    delete target._gsap.uncache;
+    const finished = complete("", {}, (target) => Object.assign(target, { _gsap: {} })) as Cached;
+    const waiting = element() as Cached;
+    registry.snapshot(waiting, waiting);
+    init(waiting, { reduced: false, defaults: {} });
+    waiting._gsap = {};
     registry.killAll({ restore: "animated" });
-    return { finish, destroy: target._gsap.uncache };
+    document.head.innerHTML = "";
+    return { finish: finished._gsap.uncache, destroy: waiting._gsap.uncache };
   }
 
   it("makes GSAP read the element's transform afresh, after finishing and on destroy(), when its CSS sets translate, rotate or scale", () => {
@@ -491,6 +492,105 @@ describe("batch", () => {
   it("uses the built-in start unless one is set", () => {
     expect(batchVars().start).toBe(defaultStart);
     expect(batchVars("", { start: "top 75%" }).start).toBe("top 75%");
+  });
+});
+
+describe("when reveals finish (#56, #57)", () => {
+  type Callbacks = Record<string, ((this: unknown, ...args: unknown[]) => void) | undefined>;
+  const ctx = (reduced = false): RevealContext => ({ reduced, defaults: {} });
+
+  // Arms a type on a fresh element, as the core does.
+  function arm(init: RevealInit, attributes = "", reduced = false): HTMLElement {
+    const target = element(attributes);
+    recorded.pieces = [];
+    registry.snapshot(target, target);
+    init(target, ctx(reduced));
+    return target;
+  }
+
+  // Plays the tween the type just built to its end, as GSAP would.
+  function playOut(target: HTMLElement): void {
+    const vars = recorded.to[recorded.to.length - 1] as Callbacks;
+    const tween = { targets: () => [target] };
+    vars.onStart?.call(tween);
+    vars.onComplete?.call(tween);
+  }
+
+  // Arms a batch of two items and returns them with a function that plays one out.
+  function armBatch(attributes = "") {
+    html(`<ul id="list" ${attributes}><li>one</li><li>two</li></ul>`);
+    const list = document.getElementById("list") as HTMLElement;
+    const items = Array.from(list.children) as HTMLElement[];
+    registry.snapshot(list, list);
+    batch(list, ctx());
+    (recorded.batch[recorded.batch.length - 1].onEnter as (group: Element[]) => void)(items);
+    const { stagger } = recorded.to[recorded.to.length - 1] as { stagger: Callbacks };
+    const finish = (item: HTMLElement) => {
+      stagger.onStart?.call({ targets: () => [item] });
+      stagger.onComplete?.call({ targets: () => [item] });
+    };
+    return { list, items, finish };
+  }
+
+  const state = (target: Element) => target.getAttribute("data-reveal-state");
+
+  it("leaves the registry empty once every play-once reveal has finished, each marked done", () => {
+    registry.killAll();
+    const done: HTMLElement[] = [];
+    for (const init of [fade, scale, blur, clip, rotate, slide, counter, split]) {
+      const target = arm(init);
+      playOut(target);
+      done.push(target);
+    }
+    const { list, items, finish } = armBatch();
+    items.forEach(finish);
+    done.push(list);
+
+    expect(registry.size).toBe(0);
+    for (const target of done) expect(state(target)).toBe("done");
+  });
+
+  it("marks a batch done, and lets it go, once its last item has finished", () => {
+    registry.killAll();
+    const { list, items, finish } = armBatch();
+    finish(items[0]);
+    expect(registry.size).toBe(1);
+    expect(state(list)).toBeNull();
+
+    finish(items[1]);
+    expect(registry.size).toBe(0);
+    expect(state(list)).toBe("done");
+  });
+
+  it("keeps a reveal with keep, marked done, so destroy() can still put it back", () => {
+    for (const init of [fade, split]) {
+      registry.killAll();
+      playOut(arm(init, "data-reveal-keep"));
+      expect(registry.size).toBe(1);
+    }
+    registry.killAll();
+    const { list, items, finish } = armBatch("data-reveal-keep");
+    items.forEach(finish);
+    expect(registry.size).toBe(1);
+    expect(state(list)).toBe("done");
+  });
+
+  it("keeps a reveal with reverse, never marked done, since it plays again", () => {
+    for (const init of [fade, counter, split]) {
+      registry.killAll();
+      const target = arm(init, "data-reveal-reverse");
+      playOut(target);
+      expect(registry.size).toBe(1);
+      expect(state(target)).toBeNull();
+    }
+  });
+
+  it("marks a play-once reveal done straight away under reduced motion, but not reverse or parallax", () => {
+    registry.killAll();
+    for (const init of [fade, counter, split]) expect(state(arm(init, "", true))).toBe("done");
+    expect(registry.size).toBe(0);
+    expect(state(arm(fade, "data-reveal-reverse", true))).toBeNull();
+    expect(state(arm(parallax, "", true))).toBeNull();
   });
 });
 

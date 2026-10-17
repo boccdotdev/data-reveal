@@ -1,4 +1,5 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import type { RevealInstance } from "../../src/index";
 
 export { expect };
 
@@ -75,9 +76,26 @@ export async function frames(page: Page): Promise<void> {
   );
 }
 
-export async function expectState(target: Locator, state: "ready" | "skipped" | "failed" | null): Promise<void> {
+export async function expectState(
+  target: Locator,
+  state: "ready" | "skipped" | "failed" | "done" | null,
+): Promise<void> {
   if (state === null) await expect(target).not.toHaveAttribute("data-reveal-state");
   else await expect(target).toHaveAttribute("data-reveal-state", state);
+}
+
+/** Waits until init() has armed the element: `ready`, or `done` if its reveal has already played. */
+export async function expectArmed(target: Locator, timeout?: number): Promise<void> {
+  await expect(target).toHaveAttribute("data-reveal-state", /^(ready|done)$/, { timeout });
+}
+
+/**
+ * Waits until the element's play-once reveal has finished: whatever the
+ * engine, it then has `data-reveal-state="done"` and has handed its styles
+ * back (unless it keeps them).
+ */
+export async function revealDone(target: Locator, timeout?: number): Promise<void> {
+  await expect(target).toHaveAttribute("data-reveal-state", "done", { timeout });
 }
 
 /** Computed opacity of the element and every descendant. */
@@ -137,14 +155,18 @@ export interface Box {
   y: number;
   width: number;
   height: number;
+  done: boolean;
   inline: boolean;
 }
 
 /**
  * Scrolls the element into view and records its box each frame, relative to
- * its `.stage` (or the page), until its reveal has handed its inline
- * transform back and five more frames have passed. `inline` says whether a
- * transform was still set inline in that frame.
+ * its `.stage` (or the page), until its reveals have finished and five more
+ * frames have passed. `done` says whether every reveal on it (its own, if it
+ * has one, and the batch it's an item of, if any) was done in that frame:
+ * the last one to finish hands the styles back as it's marked done. `inline`
+ * says whether a transform was still set inline, for an element where not
+ * every reveal finishes: GSAP's batch tween overwrites a fade on its item.
  */
 export async function sampleReveal(page: Page, id: string): Promise<Box[]> {
   return page.evaluate(
@@ -152,14 +174,18 @@ export async function sampleReveal(page: Page, id: string): Promise<Box[]> {
       new Promise<Box[]>((resolve) => {
         const element = document.getElementById(id) as HTMLElement;
         const stage = (element.closest(".stage") as HTMLElement | null) ?? document.body;
+        const reveals = [element, element.parentElement?.closest('[data-reveal="batch"]')].filter(
+          (reveal): reveal is HTMLElement => reveal instanceof HTMLElement && reveal.hasAttribute("data-reveal"),
+        );
         const samples: Box[] = [];
         let after = 0;
         const sample = () => {
           const box = element.getBoundingClientRect();
           const origin = stage.getBoundingClientRect();
+          const done = reveals.every((reveal) => reveal.getAttribute("data-reveal-state") === "done");
           const inline = element.style.transform !== "" || element.style.translate !== "";
-          samples.push({ x: box.x - origin.x, y: box.y - origin.y, width: box.width, height: box.height, inline });
-          if (samples.some((s) => s.inline) && !inline) after++;
+          samples.push({ x: box.x - origin.x, y: box.y - origin.y, width: box.width, height: box.height, done, inline });
+          if (done || (samples.some((s) => s.inline) && !inline)) after++;
           if (after >= 5 || samples.length > 600) resolve(samples);
           else requestAnimationFrame(sample);
         };
@@ -171,7 +197,7 @@ export async function sampleReveal(page: Page, id: string): Promise<Box[]> {
 }
 
 /** The box of `#<id>-twin`, an unrevealed copy with the same CSS, relative to its `.stage`. */
-export async function twinBox(page: Page, id: string): Promise<Omit<Box, "inline">> {
+export async function twinBox(page: Page, id: string): Promise<Omit<Box, "done" | "inline">> {
   return page.evaluate((id) => {
     const element = document.getElementById(`${id}-twin`) as HTMLElement;
     const box = element.getBoundingClientRect();
@@ -180,7 +206,16 @@ export async function twinBox(page: Page, id: string): Promise<Omit<Box, "inline
   }, id);
 }
 
-/** The largest change in position or size between the frame a reveal handed its transform back and the one before. */
+/** The frame the reveals on an element were all done, so its styles were handed back, or -1. */
+export function finishedAt(samples: Box[]): number {
+  return samples.findIndex((s, i) => i > 0 && !samples[i - 1].done && s.done);
+}
+
+/**
+ * The largest change in position or size between the frame GSAP's inline
+ * transform went and the one before, for elements where `done` doesn't say
+ * when the styles were handed back (see sampleReveal()).
+ */
 export function jumpAtFinish(samples: Box[]): number {
   const handed = samples.findIndex((s, i) => i > 0 && samples[i - 1].inline && !s.inline);
   if (handed < 1) return Number.NaN;
@@ -196,11 +231,8 @@ export function documentTop(target: Locator): Promise<number> {
 declare global {
   interface Window {
     __reveal: {
-      instance: {
-        init(container?: ParentNode): Promise<void>;
-        refresh(): void;
-        destroy(container?: ParentNode, options?: { revert?: boolean }): void;
-      } | null;
+      instance: RevealInstance | null;
+      second: RevealInstance | null;
       settled: boolean;
       result: string | null;
       refreshes: number;

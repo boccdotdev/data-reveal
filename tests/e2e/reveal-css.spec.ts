@@ -1,4 +1,4 @@
-import { expect, expectState, instanceReady, test } from "./helpers";
+import { expect, expectArmed, expectState, instanceReady, test } from "./helpers";
 
 test("hides reveal elements until init() reaches them", async ({ page, fixtureUrl }) => {
   // A long failsafe, so it can't be what shows the elements below.
@@ -10,7 +10,7 @@ test("hides reveal elements until init() reaches them", async ({ page, fixtureUr
   await expect(page.locator("#parallax")).toHaveCSS("opacity", "1");
 
   await page.evaluate(() => window.__reveal.instance?.init());
-  await expectState(page.locator("#fade"), "ready");
+  await expectArmed(page.locator("#fade"));
   await expect(page.locator("#fade")).toHaveCSS("opacity", "1");
   await expectState(page.locator("#unknown"), "skipped");
   await expect(page.locator("#unknown")).toHaveCSS("opacity", "1");

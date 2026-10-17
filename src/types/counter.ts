@@ -2,8 +2,9 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
+import { revealed, revealedAtOnce } from "../internal/finish.js";
 import { option, options } from "../internal/options.js";
-import { revealTrigger } from "../internal/trigger.js";
+import { isReverse, revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -43,6 +44,7 @@ export const init: RevealInit = (el, ctx) => {
 
   if (ctx.reduced) {
     el.textContent = format(to);
+    revealedAtOnce(el, ctx);
     return;
   }
 
@@ -56,6 +58,9 @@ export const init: RevealInit = (el, ctx) => {
     onUpdate: () => {
       el.textContent = format(counter.value);
     },
+    // The text it ends on is the text destroy() would leave, so a finished
+    // count has nothing to undo.
+    onComplete: isReverse(el, ctx) ? undefined : () => revealed(el, { release: true }),
     scrollTrigger: revealTrigger(el, ctx),
   });
 

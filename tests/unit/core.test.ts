@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RevealDefaults, RevealInit } from "../../src/internal/types";
 import { deferred, el, fakeType, html, loadCore, settle, state } from "./helpers";
 
-const scrollTrigger = { refresh: vi.fn(), triggers: 1, fail: false };
+const scrollTrigger = { refresh: vi.fn(), triggers: 1, fail: false, listeners: new Set<() => void>() };
+
+// What ScrollTrigger does once a refresh has run.
+function refreshed(): void {
+  scrollTrigger.listeners.forEach((listener) => listener());
+}
 
 // Frames queue up here instead of running, so a refresh one test schedules
 // can't land in another, and a test runs them when it's ready.
@@ -17,11 +22,17 @@ beforeEach(() => {
   scrollTrigger.refresh.mockClear();
   scrollTrigger.triggers = 1;
   scrollTrigger.fail = false;
+  scrollTrigger.listeners.clear();
   // Registered per test, so a module one test loaded isn't reused by the next.
   vi.doMock("gsap/ScrollTrigger", () => {
     if (scrollTrigger.fail) throw new Error("ScrollTrigger chunk is gone");
     return {
-      ScrollTrigger: { refresh: scrollTrigger.refresh, getAll: () => Array(scrollTrigger.triggers).fill({}) },
+      ScrollTrigger: {
+        refresh: scrollTrigger.refresh,
+        getAll: () => Array(scrollTrigger.triggers).fill({}),
+        addEventListener: (_type: string, listener: () => void) => scrollTrigger.listeners.add(listener),
+        removeEventListener: (_type: string, listener: () => void) => scrollTrigger.listeners.delete(listener),
+      },
     };
   });
   frames = [];
@@ -504,6 +515,90 @@ describe("destroy()", () => {
   });
 });
 
+describe("two instances on one page (#54)", () => {
+  async function setup() {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const scale = fakeType(registry);
+    const a = createRevealCore((type) => (type === "fade" ? fade.init : null));
+    const b = createRevealCore((type) => (type === "scale" ? scale.init : null));
+    html(`
+      <section id="swap"><div id="fade" data-reveal="fade"></div><div id="scale" data-reveal="scale"></div></section>
+      <div id="outside" data-reveal="scale"></div>
+    `);
+    await a.init();
+    await b.init();
+    return { a, b, fade, scale };
+  }
+
+  it("destroy() kills only the reveals its own instance armed", async () => {
+    const { a, b, fade, scale } = await setup();
+
+    a.destroy();
+    expect(fade.kills.get(el("fade"))).toHaveBeenCalledTimes(1);
+    expect(scale.kills.get(el("scale"))).not.toHaveBeenCalled();
+    expect(scale.kills.get(el("outside"))).not.toHaveBeenCalled();
+    expect(state("scale")).toBe("ready");
+
+    // B still owns its elements, and a later init() doesn't arm them twice.
+    await b.init();
+    expect(scale.armed).toEqual([el("scale"), el("outside")]);
+    b.destroy();
+    expect(scale.kills.get(el("scale"))).toHaveBeenCalledTimes(1);
+  });
+
+  it("destroy(container) does the same for a subtree", async () => {
+    const { a, b, fade, scale } = await setup();
+
+    a.destroy(el("swap"));
+    expect(fade.kills.get(el("fade"))).toHaveBeenCalledTimes(1);
+    expect(scale.kills.get(el("scale"))).not.toHaveBeenCalled();
+
+    b.destroy(el("swap"));
+    expect(scale.kills.get(el("scale"))).toHaveBeenCalledTimes(1);
+    expect(scale.kills.get(el("outside"))).not.toHaveBeenCalled();
+  });
+
+  it("doesn't arm an element a separately bundled copy of the package has armed", async () => {
+    // Each copy has its own module state and registry.
+    const one = await loadCore();
+    const two = await loadCore();
+    const first = fakeType(one.registry);
+    const second = fakeType(two.registry);
+    const a = one.createRevealCore(() => first.init);
+    const b = two.createRevealCore(() => second.init);
+    html(`<div id="x" data-reveal="fade"></div>`);
+
+    await a.init();
+    await b.init();
+    expect(second.armed).toEqual([]);
+
+    a.destroy();
+    await b.init();
+    expect(second.armed).toEqual([el("x")]);
+  });
+
+  it("doesn't arm an element another instance has armed, until that one destroys it", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const first = fakeType(registry);
+    const second = fakeType(registry);
+    const a = createRevealCore(() => first.init);
+    const b = createRevealCore(() => second.init);
+    html(`<div id="x" data-reveal="fade"></div>`);
+
+    await a.init();
+    await b.init();
+    expect(second.armed).toEqual([]);
+
+    a.destroy();
+    await b.init();
+    expect(second.armed).toEqual([el("x")]);
+    // Now it's B's, so A leaves it alone.
+    await a.init();
+    expect(first.armed).toEqual([el("x")]);
+  });
+});
+
 describe("destroy() and what types left behind", () => {
   // A stand-in type that sets a from-state inline, as the built-in ones do.
   async function setup() {
@@ -546,9 +641,43 @@ describe("destroy() and what types left behind", () => {
 
   it("leaves the inline styles with { revert: false }", async () => {
     const reveal = await setup();
-    reveal.destroy(undefined, { revert: false });
+    reveal.destroy({ revert: false });
     expect(el("a").style.opacity).toBe("0");
     expect(el("a").style.transform).toBe("translateY(20px)");
+  });
+
+  it("takes the options after a container, or after undefined", async () => {
+    const reveal = await setup();
+    reveal.destroy(el("swap"), { revert: false });
+    expect(el("a").style.opacity).toBe("0");
+
+    await reveal.init();
+    reveal.destroy(undefined, { revert: false });
+    expect(el("a").style.opacity).toBe("0");
+  });
+
+  it("takes a node from another realm, such as an iframe's, as the container", async () => {
+    const reveal = await setup();
+    // A node from an iframe isn't `instanceof Node` in this realm.
+    Object.defineProperty(Node, Symbol.hasInstance, { value: () => false, configurable: true });
+    try {
+      reveal.destroy(el("swap"), { revert: false });
+    } finally {
+      delete (Node as unknown as Record<symbol, unknown>)[Symbol.hasInstance];
+    }
+    expect(el("a").style.opacity).toBe("0");
+  });
+
+  it("throws on a first argument that is neither a node nor options, and tears nothing down", async () => {
+    const reveal = await setup();
+    // Like a jQuery object wrapping the container.
+    const wrapped: unknown = Object.assign(Object.create({ jquery: "3.7.1" }), { 0: el("swap"), length: 1 });
+    expect(() => reveal.destroy(wrapped as ParentNode)).toThrow(TypeError);
+    expect(el("a").style.opacity).toBe("0");
+
+    // null is taken as no container.
+    reveal.destroy(null as unknown as undefined, { revert: false });
+    expect(el("a").style.opacity).toBe("0");
   });
 
   it("shows a reverted element that a site's own pre-hide would hide", async () => {
@@ -586,14 +715,36 @@ describe("refresh", () => {
     expect(scrollTrigger.refresh).toHaveBeenCalledWith(true);
   });
 
-  it("doesn't refresh while there are no triggers", async () => {
+  it("resolves once the refresh has run, with one promise for every call before it", async () => {
+    const { createRevealCore } = await loadCore();
+    const reveal = createRevealCore(() => null);
+    const first = reveal.refresh();
+    expect(reveal.refresh()).toBe(first);
+    let resolved = false;
+    void first.then(() => (resolved = true));
+
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+    runFrames();
+    expect(scrollTrigger.refresh).toHaveBeenCalledTimes(1);
+    await settle();
+    expect(resolved).toBe(false);
+
+    refreshed();
+    await first;
+    expect(scrollTrigger.listeners.size).toBe(0);
+    // A call after that frame starts the next refresh.
+    expect(reveal.refresh()).not.toBe(first);
+  });
+
+  it("doesn't refresh while there are no triggers, and resolves anyway", async () => {
     const { createRevealCore } = await loadCore();
     const reveal = createRevealCore(() => null);
     scrollTrigger.triggers = 0;
 
-    reveal.refresh();
+    const done = reveal.refresh();
     await vi.waitFor(() => expect(frames).toHaveLength(1));
     runFrames();
+    await done;
     expect(scrollTrigger.refresh).not.toHaveBeenCalled();
   });
 
@@ -613,11 +764,16 @@ describe("refresh", () => {
       expect(unhandled).not.toHaveBeenCalled();
       expect(frames).toHaveLength(0);
 
+      // refresh() still resolves, with nothing to refresh.
+      await reveal.refresh();
+
       scrollTrigger.fail = false;
-      reveal.refresh();
+      const done = reveal.refresh();
       await vi.waitFor(() => expect(frames).toHaveLength(1));
       runFrames();
       expect(scrollTrigger.refresh).toHaveBeenCalledTimes(1);
+      refreshed();
+      await done;
     } finally {
       process.off("unhandledRejection", unhandled);
     }

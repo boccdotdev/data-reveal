@@ -21,7 +21,8 @@ test("every type snaps to its end state without scrolling", async ({ page, fixtu
 
   for (const type of allTypes) {
     const target = page.locator(`#${type}`);
-    await expectState(target, "ready");
+    // Already at its end, so done, except parallax, which never finishes.
+    await expectState(target, type === "parallax" ? "ready" : "done");
     await expect(target).toHaveCSS("opacity", "1");
   }
   await expect(page.locator("#counter")).toHaveText("1,200");

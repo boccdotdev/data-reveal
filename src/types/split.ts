@@ -3,9 +3,9 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { registry } from "../core/registry.js";
 import { finish, unhide } from "../core/visibility.js";
-import { revealCallbacks } from "../internal/finish.js";
+import { revealCallbacks, revealedAtOnce } from "../internal/finish.js";
 import { option, options } from "../internal/options.js";
-import { cleansUp, revealTrigger } from "../internal/trigger.js";
+import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration, SplitAria, SplitType } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
@@ -55,6 +55,7 @@ function readCopiesInstead(pieces: Element[]): void {
 export const init: RevealInit = (el, ctx) => {
   if (ctx.reduced) {
     unhide(el);
+    revealedAtOnce(el, ctx);
     return;
   }
 
@@ -66,7 +67,6 @@ export const init: RevealInit = (el, ctx) => {
     ease: "back.out(1.7)",
   });
   const aria = ariaFor(splitType, option(el, ctx, "aria"));
-  const cleanUp = cleansUp(el, ctx);
   unhide(el);
 
   // The tween for the current split, and how many splits there have been.
@@ -104,9 +104,8 @@ export const init: RevealInit = (el, ctx) => {
         scrollTrigger: revealTrigger(el, ctx),
         // A finished play-once split puts the element's own HTML back: best
         // for assistive tech and copying, and nothing left to re-split.
-        ...revealCallbacks(el, {
+        ...revealCallbacks(el, ctx, {
           target: el,
-          cleanUp,
           onFinish: () => {
             unwatchFonts();
             self.revert();

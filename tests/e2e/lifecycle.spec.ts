@@ -1,4 +1,4 @@
-import { expect, expectState, initResult, test } from "./helpers";
+import { expect, expectArmed, expectState, initResult, test } from "./helpers";
 
 test("init() on a card before it's inserted reveals it once inserted", async ({ page, fixtureUrl }) => {
   await page.goto(fixtureUrl("basic"));
@@ -14,13 +14,13 @@ test("init() on a card before it's inserted reveals it once inserted", async ({ 
     await window.__reveal.instance?.init(card);
     document.body.prepend(card);
   });
-  await expectState(page.locator("#card"), "ready");
+  await expectArmed(page.locator("#card"));
   await expect(page.locator("#card")).toHaveCSS("opacity", "1");
 });
 
 test("a later init() doesn't wait for a chunk that never arrives", async ({ page, fixtureUrl }) => {
   await page.goto(fixtureUrl("basic", { faults: { hang: ["split"] } }));
-  await expectState(page.locator("#fade"), "ready");
+  await expectArmed(page.locator("#fade"));
   await expectState(page.locator("#split"), null);
 
   const outcome = await page.evaluate(async () => {
@@ -34,6 +34,6 @@ test("a later init() doesn't wait for a chunk that never arrives", async ({ page
     return Promise.race([window.__reveal.instance?.init().then(() => "resolved"), timeout]);
   });
   expect(outcome).toBe("resolved");
-  await expectState(page.locator("#card"), "ready");
+  await expectArmed(page.locator("#card"));
   await expect(page.locator("#card")).toHaveCSS("opacity", "1");
 });

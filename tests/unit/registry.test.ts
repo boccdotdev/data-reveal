@@ -71,6 +71,17 @@ describe("registry", () => {
     expect(kills.get("inner")).toHaveBeenCalledTimes(1);
   });
 
+  it("killAll() and kill(container) kill only the reveals `owned` accepts", async () => {
+    const { registry, kills } = await setup();
+    const mine = (element: Element) => element.id !== "inner";
+
+    expect(registry.kill(el("outer"), { owned: mine })).toEqual([el("outer"), el("deep")]);
+    expect(kills.get("inner")).not.toHaveBeenCalled();
+    expect(registry.killAll({ owned: mine })).toEqual([el("other")]);
+    expect(kills.get("inner")).not.toHaveBeenCalled();
+    expect(registry.size).toBe(1);
+  });
+
   it("reverts splits when their element is killed", async () => {
     const { registry } = await loadCore();
     html(`<h2 id="a"></h2>`);
@@ -232,5 +243,51 @@ describe("snapshots", () => {
     expect(style.clipPath).toBe("");
     expect(style.filter).toBe("");
     expect(style.color).toBe("blue");
+  });
+});
+
+describe("release()", () => {
+  it("drops a finished reveal, killing what it registered", async () => {
+    const { registry } = await loadCore();
+    html(`<div id="a"></div><div id="b"></div>`);
+    const tween = { kill: vi.fn(), scrollTrigger: { kill: vi.fn() } };
+    registry.snapshot(el("a"), el("a"));
+    registry.track(el("a"), tween);
+    registry.snapshot(el("b"), el("b"));
+
+    registry.release(el("a"));
+    expect(registry.size).toBe(1);
+    expect(tween.kill).toHaveBeenCalledTimes(1);
+    expect(tween.scrollTrigger.kill).toHaveBeenCalledTimes(1);
+    // destroy() has nothing left to do for it.
+    el("a").style.opacity = "0.5";
+    expect(registry.killAll({ restore: "animated" })).toEqual([el("b")]);
+    expect(el("a").style.opacity).toBe("0.5");
+  });
+
+  it("waits for every reveal sharing a snapshot to finish, then drops them together", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.snapshot(el("list"), el("list"));
+    registry.snapshot(el("list"), el("item"));
+    registry.snapshot(el("item"), el("item"));
+
+    registry.release(el("item"));
+    expect(registry.size).toBe(2);
+    registry.release(el("list"));
+    expect(registry.size).toBe(0);
+  });
+
+  it("lets a later reveal of the same target take a fresh snapshot", async () => {
+    const { registry } = await loadCore();
+    html(`<div id="a"></div>`);
+    registry.snapshot(el("a"), el("a"));
+    registry.release(el("a"));
+
+    el("a").style.color = "red";
+    registry.snapshot(el("a"), el("a"));
+    el("a").style.opacity = "0";
+    registry.killAll({ restore: "style" });
+    expect(el("a").style.cssText).toBe("color: red;");
   });
 });

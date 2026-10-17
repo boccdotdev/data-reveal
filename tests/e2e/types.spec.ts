@@ -1,4 +1,4 @@
-import { documentTop, expect, expectState, initResult, isClipped, opacities, scrollTo, test } from "./helpers";
+import { documentTop, expect, expectState, initResult, isClipped, opacities, revealDone, scrollTo, test } from "./helpers";
 
 test.describe("every built-in type", () => {
   test.beforeEach(async ({ page, fixtureUrl }) => {
@@ -13,6 +13,7 @@ test.describe("every built-in type", () => {
       await expect(target).toHaveCSS("opacity", "0");
 
       await scrollTo(target);
+      await revealDone(target);
       await expect(target).toHaveCSS("opacity", "1");
     });
   }
@@ -25,6 +26,9 @@ test.describe("every built-in type", () => {
     await scrollTo(target);
     await expect.poll(() => opacities(target)).not.toContain("0");
     expect(await opacities(target)).toEqual(expect.arrayContaining(["1"]));
+    // Done once it has put the heading's own HTML back.
+    await revealDone(target);
+    await expect(target.locator("*")).toHaveCount(0);
   });
 
   test("batch reveals its items once scrolled to", async ({ page }) => {
@@ -34,6 +38,7 @@ test.describe("every built-in type", () => {
     await expect(items.first()).toHaveCSS("opacity", "0");
 
     await scrollTo(target);
+    await revealDone(target);
     await expect(items.first()).toHaveCSS("opacity", "1");
     await expect(items.last()).toHaveCSS("opacity", "1");
     await expect(target).toHaveCSS("opacity", "1");
@@ -45,7 +50,8 @@ test.describe("every built-in type", () => {
     expect(await isClipped(target)).toBe(true);
 
     await scrollTo(target);
-    await expect.poll(() => isClipped(target)).toBe(false);
+    await revealDone(target);
+    expect(await isClipped(target)).toBe(false);
     await expect(target).toHaveCSS("opacity", "1");
   });
 
@@ -56,6 +62,7 @@ test.describe("every built-in type", () => {
     await expect(target).toHaveCSS("opacity", "1");
 
     await scrollTo(target);
+    await revealDone(target);
     await expect(target).toHaveText("1,200");
   });
 
@@ -68,5 +75,7 @@ test.describe("every built-in type", () => {
     await page.evaluate(() => window.scrollBy(0, 200));
     await expect.poll(async () => Math.abs((await documentTop(target)) - before)).toBeGreaterThan(5);
     await expect(target).toHaveCSS("opacity", "1");
+    // It never finishes.
+    await expectState(target, "ready");
   });
 });

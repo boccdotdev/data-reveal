@@ -2,10 +2,10 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
-import { revealCallbacks } from "../internal/finish.js";
+import { revealCallbacks, revealedAtOnce } from "../internal/finish.js";
 import { options } from "../internal/options.js";
 import { ownTransform } from "../internal/transform.js";
-import { cleansUp, revealTrigger } from "../internal/trigger.js";
+import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -20,6 +20,7 @@ const directionMap: Record<Direction, { x?: number; y?: number }> = {
 export const init: RevealInit = (el, ctx) => {
   if (ctx.reduced) {
     unhide(el);
+    revealedAtOnce(el, ctx);
     return;
   }
 
@@ -48,7 +49,7 @@ export const init: RevealInit = (el, ctx) => {
     delay,
     ease,
     scrollTrigger: revealTrigger(el, ctx),
-    ...revealCallbacks(el, { cleanUp: cleansUp(el, ctx) }),
+    ...revealCallbacks(el, ctx),
   });
 
   registry.track(el, tween);

@@ -7,6 +7,7 @@ import {
   leftovers,
   nothingLeft,
   opacities,
+  revealDone,
   scrollTo,
   test,
 } from "./helpers";
@@ -74,8 +75,11 @@ test.describe("a finished play-once reveal", () => {
       const target = page.locator(`#${id}`);
       await scrollTo(target);
       // Its twin finishing means its own reveal has finished too.
-      await expect.poll(() => leftovers(page.locator(`#${id}-twin`))).toEqual(nothingLeft);
+      await revealDone(page.locator(`#${id}-twin`));
+      expect(await leftovers(page.locator(`#${id}-twin`))).toEqual(nothingLeft);
       expect((await leftovers(target)).transform).not.toBe("none");
+      // Done with keep, but not with reverse, which plays again.
+      await expectState(target, id === "keep" ? "done" : "ready");
     }
   });
 });
@@ -153,7 +157,7 @@ test.describe("destroy()", () => {
     await page.goto(fixtureUrl("types"));
     expect(await initResult(page)).toBe("resolved");
 
-    await page.evaluate(() => window.__reveal.instance?.destroy(undefined, { revert: false }));
+    await page.evaluate(() => window.__reveal.instance?.destroy({ revert: false }));
     await expect(page.locator("#fade")).toHaveCSS("opacity", "0");
   });
 });

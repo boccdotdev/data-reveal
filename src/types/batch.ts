@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
-import { revealCallbacks } from "../internal/finish.js";
+import { revealCallbacks, revealed, revealedAtOnce } from "../internal/finish.js";
 import { option, options } from "../internal/options.js";
 import { ownTransform } from "../internal/transform.js";
 import { cleansUp, isReverse, revealStart } from "../internal/trigger.js";
@@ -18,6 +18,7 @@ export const init: RevealInit = (el, ctx) => {
   if (ctx.reduced) {
     unhide(el);
     targets.forEach(unhide);
+    revealedAtOnce(el, ctx);
     return;
   }
 
@@ -31,8 +32,18 @@ export const init: RevealInit = (el, ctx) => {
   const ease = option(el, ctx, "ease");
   const reverse = isReverse(el, ctx);
   // Callbacks per item, so each item hands its props back as soon as its own
-  // reveal finishes.
-  const itemStagger = { each: stagger, ...revealCallbacks(el, { cleanUp: cleansUp(el, ctx) }) };
+  // reveal finishes. The batch is done once every item is.
+  const cleanUp = cleansUp(el, ctx);
+  const finished = new Set<HTMLElement>();
+  const itemStagger = {
+    each: stagger,
+    ...revealCallbacks(el, ctx, {
+      onDone: (item) => {
+        finished.add(item);
+        if (finished.size === targets.length) revealed(el, { release: cleanUp });
+      },
+    }),
+  };
   // Every group's tween stays registered until it completes or `overwrite`
   // interrupts it (its items entered or left again), so destroy() stops each
   // group still animating.
@@ -76,7 +87,7 @@ export const init: RevealInit = (el, ctx) => {
           const tween = gsap.to(group, {
             ...hidden,
             duration,
-            stagger: { each: stagger, ...revealCallbacks(el, { cleanUp: false }) },
+            stagger: { each: stagger, ...revealCallbacks(el, ctx, { cleanUp: false }) },
             ease: ease ?? "power2.in",
             overwrite: true,
             ...untilDone,

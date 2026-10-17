@@ -85,7 +85,13 @@ export interface RevealDefaults {
   typeDefaults?: RevealTypeDefaults;
 }
 
+/**
+ * What the core passes a type's init besides the element. Part of the
+ * type-author contract (with `RevealInit`) for 0.4 only: 0.5 replaces it
+ * with an engine contract (#51).
+ */
 export interface RevealContext {
+  /** Whether the visitor asked for reduced motion. */
   reduced: boolean;
   /**
    * `defaults` with this type's `typeDefaults` applied over them. The core
@@ -94,6 +100,10 @@ export interface RevealContext {
   defaults?: RevealOptions;
 }
 
+/**
+ * A type's init: arms the reveal on `el`. The type-author contract for 0.4
+ * only, with `RevealContext`: 0.5 replaces it with an engine contract (#51).
+ */
 export type RevealInit = (el: HTMLElement, ctx: RevealContext) => void;
 
 /**

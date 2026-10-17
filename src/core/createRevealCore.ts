@@ -1,5 +1,6 @@
 import { prefersReducedMotion } from "./reducedMotion.js";
 import { registry } from "./registry.js";
+import { setState } from "./state.js";
 import { unhide } from "./visibility.js";
 import { parseOptions } from "../internal/options.js";
 import type { RevealDefaults, RevealInit, RevealOptions, RevealType } from "../internal/types.js";
@@ -13,7 +14,8 @@ export type RevealResolver = (
 
 // ScrollTrigger.refresh() recalculates every trigger globally and forces a
 // synchronous layout. Coalesce calls into one per frame so repeated init()
-// (e.g. infinite scroll) doesn't thrash layout.
+// (e.g. infinite scroll) doesn't thrash layout. Every call until that frame
+// gets the same promise, which settles once the refresh has run.
 //
 // Safe mode: in GSAP 3.13 to 3.15, refresh(true) restarts a 0.2 s delayed
 // call instead of refreshing at once, and that delayed refresh isn't forced,
@@ -22,32 +24,70 @@ export type RevealResolver = (
 // scroll position while it measures, which aborts a smooth scroll in flight
 // (`scroll-behavior: smooth`, a scrollTo tween, Lenis). Safe mode needs
 // ScrollTrigger to be set up, which it is once any trigger exists, and with
-// no triggers there's nothing to refresh anyway.
-let refreshQueued = false;
-async function scheduleRefresh(): Promise<void> {
-  if (refreshQueued) return;
-  refreshQueued = true;
-  try {
-    const { ScrollTrigger } = await import("gsap/ScrollTrigger");
-    requestAnimationFrame(() => {
-      refreshQueued = false;
-      if (ScrollTrigger.getAll().length > 0) ScrollTrigger.refresh(true);
-    });
-  } catch {
-    // ScrollTrigger didn't load (e.g. its chunk is gone after a deploy), so
-    // nothing needs refreshing. Unqueue so a later call can try again.
-    refreshQueued = false;
-  }
+// no triggers there's nothing to refresh anyway, so the promise settles
+// straight away.
+let queuedRefresh: Promise<void> | undefined;
+function scheduleRefresh(): Promise<void> {
+  queuedRefresh ??= (async () => {
+    try {
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          queuedRefresh = undefined;
+          if (ScrollTrigger.getAll().length === 0) return resolve();
+          // ScrollTrigger calls its listeners from an array, so removing one
+          // while it does would skip the next.
+          const refreshed = (): void => {
+            resolve();
+            queueMicrotask(() => ScrollTrigger.removeEventListener("refresh", refreshed));
+          };
+          ScrollTrigger.addEventListener("refresh", refreshed);
+          ScrollTrigger.refresh(true);
+        });
+      });
+    } catch {
+      // ScrollTrigger didn't load (e.g. its chunk is gone after a deploy), so
+      // nothing needs refreshing. Unqueue so a later call can try again.
+      queuedRefresh = undefined;
+    }
+  })();
+  return queuedRefresh;
 }
 
-// init() sets `data-reveal-state` on every element it handles, whatever the
-// outcome, so the pre-hide CSS (`reveal.css`) stops hiding it. "ready": its
-// type took over. "skipped": no type is registered under that name.
-// "failed": the type's module failed to load or its init threw.
-type RevealState = "ready" | "skipped" | "failed";
+// Which instance armed each element: that instance's current token, kept on
+// the element under a global symbol rather than in this module, so every copy
+// of the package on the page sees it (two separately bundled scripts each
+// have their own module state and registry). Each destroy() only touches the
+// elements its own token is on. A bare destroy() clears the token's `live`
+// flag, which tells every copy those elements are free again. An element
+// another live instance armed isn't armed again. Other copies, possibly other
+// versions, read the token, so its shape has to stay `{ live: boolean }`.
+type Token = { live: boolean };
+const armedKey = Symbol.for("@boccdotdev/data-reveal.armedBy");
+const marks = (el: Element) => el as unknown as Record<symbol, Token | undefined>;
+const armedBy = (el: Element): Token | undefined => marks(el)[armedKey];
 
-function setState(el: HTMLElement, state: RevealState): void {
-  el.setAttribute("data-reveal-state", state);
+// destroy() takes (options), (container, options) or (undefined, options).
+// A node from another realm (an iframe's document) isn't `instanceof Node`
+// here, so go by `nodeType`. Anything else is a mistake, such as a jQuery
+// object, and destroying the whole instance for it would be worse than
+// saying so.
+function destroyArguments(
+  first: unknown,
+  second: RevealDestroyOptions | undefined,
+): { container?: ParentNode; options: RevealDestroyOptions } {
+  if (first == null) return { options: second ?? {} };
+  const nodeType = (first as Partial<Node>).nodeType;
+  if (nodeType === 1 || nodeType === 9 || nodeType === 11) {
+    return { container: first as ParentNode, options: second ?? {} };
+  }
+  const prototype: unknown = typeof first === "object" ? Object.getPrototypeOf(first) : undefined;
+  if (prototype === null || (prototype !== undefined && Object.getPrototypeOf(prototype) === null)) {
+    return { options: first as RevealDestroyOptions };
+  }
+  throw new TypeError(
+    "destroy() takes an element, document or fragment to tear down, an options object, or both",
+  );
 }
 
 // What one init() call knows about the elements it scanned.
@@ -76,6 +116,11 @@ const globalsIgnored = new Map<string, Array<keyof RevealOptions>>([
   ["split", ["stagger"]],
 ]);
 
+/**
+ * What `createReveal()` returns. Several instances can share a page (one per
+ * script or bundle, say): each one's `destroy()` touches only the reveals it
+ * armed itself.
+ */
 export interface RevealInstance {
   /**
    * Scan the container (and the container itself, if it has `data-reveal`)
@@ -92,15 +137,19 @@ export interface RevealInstance {
    * Recompute every ScrollTrigger's start/end positions. Call after a layout
    * change that ScrollTrigger can't detect on its own (e.g. toggling a grid's
    * column count, an accordion opening, late-loading fonts/images). Coalesced
-   * to one refresh per frame.
+   * to one refresh per frame. The promise resolves once the refresh has run,
+   * about 200 ms later and after any scrolling has stopped, or straight away
+   * when there's nothing to refresh.
    */
-  refresh(): void;
+  refresh(): Promise<void>;
   /**
-   * Tear down reveals. With no container, kills everything and forgets all
-   * elements so a later `init()` re-runs the whole page. With a container,
-   * kills only reveals on or inside it and forgets just those elements, so
-   * re-adding content there and calling `init()` re-animates it. Elements an
-   * unfinished `init()` is still loading are dropped from that call.
+   * Tear down this instance's reveals. With no container, kills them all and
+   * forgets every element so a later `init()` re-runs the whole page. With a
+   * container, kills only reveals on or inside it and forgets just those
+   * elements, so re-adding content there and calling `init()` re-animates
+   * it. Elements an unfinished `init()` is still loading are dropped from
+   * that call. Reveals another instance armed are left alone, as are ones
+   * that have finished, which have already handed everything back.
    *
    * By default every element goes back to how it was before `init()`: the
    * props reveals animate (opacity, transforms, clip-path, filter), on the
@@ -109,7 +158,8 @@ export interface RevealInstance {
    * `{ revert: false }` to leave the reveals' inline styles in place, e.g.
    * when the elements are about to be removed anyway.
    */
-  destroy(container?: ParentNode, options?: RevealDestroyOptions): void;
+  destroy(options?: RevealDestroyOptions): void;
+  destroy(container: ParentNode | undefined, options?: RevealDestroyOptions): void;
 }
 
 export interface RevealDestroyOptions {
@@ -131,6 +181,12 @@ export function createRevealCore(
   // repeatedly as the DOM grows (e.g. infinite scroll) without re-animating
   // existing elements.
   let claims = new WeakMap<Element, object>();
+  // This instance's mark on the elements it armed (see `armedKey`).
+  let token: Token = { live: true };
+  const owned = (el: Element): boolean => armedBy(el) === token;
+  const unmark = (el: Element): void => {
+    if (owned(el)) delete marks(el)[armedKey];
+  };
 
   // The defaults a type's init gets: its own typeDefaults over the global
   // ones it doesn't ignore, both read by the same rules as attributes, so an
@@ -161,6 +217,7 @@ export function createRevealCore(
     // Release the element so a later init() can try it again.
     const fail = (el: HTMLElement): void => {
       claims.delete(el);
+      unmark(el);
       setState(el, "failed");
       unhide(el);
     };
@@ -187,6 +244,14 @@ export function createRevealCore(
         }
         continue;
       }
+      // Another instance with this type armed it first, so it's that one's.
+      // Let go, so this instance can take it once that one destroys it.
+      const owner = armedBy(el);
+      if (owner?.live && owner !== token) {
+        claims.delete(el);
+        continue;
+      }
+      marks(el)[armedKey] = token;
       // Set first, so reveal.css lets go before the type looks at the
       // element's opacity.
       setState(el, "ready");
@@ -243,22 +308,33 @@ export function createRevealCore(
       if (first) throw first[0];
     },
 
-    refresh(): void {
-      scheduleRefresh();
+    refresh(): Promise<void> {
+      return scheduleRefresh();
     },
 
-    destroy(container?: ParentNode, { revert = true }: RevealDestroyOptions = {}): void {
+    destroy(first?: ParentNode | RevealDestroyOptions, second?: RevealDestroyOptions): void {
+      const {
+        container,
+        options: { revert = true },
+      } = destroyArguments(first, second);
+      const restore = revert ? "animated" : "none";
       let killed: Element[];
       if (!container) {
-        killed = registry.killAll({ restore: revert ? "animated" : "none" });
+        killed = registry.killAll({ restore, owned });
         claims = new WeakMap();
+        token.live = false;
+        token = { live: true };
       } else {
+        killed = registry.kill(container, { restore, owned });
         // Forget every matching element so init() can re-animate it later.
-        container.querySelectorAll<HTMLElement>("[data-reveal]").forEach((el) => claims.delete(el));
-        if (container instanceof Element && container.matches("[data-reveal]")) {
-          claims.delete(container);
+        const found = Array.from(container.querySelectorAll("[data-reveal]"));
+        if ((container as Node).nodeType === 1 && (container as Element).matches("[data-reveal]")) {
+          found.push(container as Element);
         }
-        killed = registry.kill(container, { restore: revert ? "animated" : "none" });
+        for (const el of found) {
+          claims.delete(el);
+          unmark(el);
+        }
       }
       // Back as it was, an element is still marked as handled, so reveal.css
       // leaves it alone, but a site's own pre-hide could hide it again.

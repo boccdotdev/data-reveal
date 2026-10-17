@@ -52,7 +52,7 @@ The file sits at the package root, so `postcss-import` (as in Tailwind v3 setups
 It only hides content while that's safe:
 
 - Only on screen, while JavaScript is on and the visitor hasn't asked for reduced motion. The stylesheet never hides anything in print, though an element a type has already set to its hidden starting state, such as a fade below the fold, still prints blank for now. Browsers without the `scripting` media feature (Safari before 17, Chrome before 120, Firefox before 113) skip the rule, so their visitors can see the flash but never a blank page.
-- Only until `init()` handles the element. `init()` sets `data-reveal-state` on every element it reaches: `ready` when its type took over, `skipped` when no type is registered under that name, and `failed` when the type's module didn't load or its init threw. The stylesheet lets go in all three cases.
+- Only until `init()` handles the element. `init()` sets [`data-reveal-state`](#data-reveal-state) on every element it reaches, whatever happens to it, and the stylesheet lets go as soon as the attribute is there.
 - If your script never runs, a CSS failsafe shows the content after 5 seconds. Change the delay with a custom property. The value needs a time unit, like `3s` or `3000ms`. Anything else, `0` included, shows the content straight away.
 
 ```css
@@ -106,6 +106,8 @@ Each type is importable from its own subpath: `@boccdotdev/data-reveal/{fade,sca
 
 The returned instance is the same as auto mode — `init`, `refresh`, `destroy` all behave identically. Choose auto for zero-config convenience, manual when build size matters.
 
+The manual entry also exports `RevealRegistration`, and both entries export `RevealInit` and `RevealContext`, which describe a type's `init(el, ctx)`. They're how a type is written in 0.4 only. 0.5 replaces them with a contract for animation engines.
+
 ## API
 
 ```ts
@@ -114,11 +116,12 @@ const reveal = createReveal();
 await reveal.init();              // scan document
 await reveal.init(myContainer);   // scan a subtree only (any ParentNode), including myContainer itself
 
-reveal.refresh();                 // recompute all ScrollTrigger positions
+await reveal.refresh();           // recompute all ScrollTrigger positions
 
-reveal.destroy();                 // kill everything, put elements back, forget them
+reveal.destroy();                 // kill this instance's reveals, put elements back, forget them
 reveal.destroy(myContainer);      // the same, only for reveals on/inside myContainer
-reveal.destroy(myContainer, { revert: false }); // leave the reveals' inline styles in place
+reveal.destroy({ revert: false }); // leave the reveals' inline styles in place
+reveal.destroy(myContainer, { revert: false });
 ```
 
 `init()` is idempotent — already-initialized elements are skipped, so you can safely call it again as new content is added (e.g. infinite scroll).
@@ -133,17 +136,38 @@ Each call waits only for the elements it claims. If an earlier call is still loa
 
 Recomputes every ScrollTrigger's start/end positions. ScrollTrigger already refreshes on window resize and load, but a **JavaScript-driven layout change doesn't fire that** — so call `refresh()` after toggling a grid's column count, opening an accordion, or when fonts/images finish loading and shift the page. Calls are coalesced to one refresh per frame, so it's cheap to call repeatedly.
 
-The refresh after `refresh()`, and the one `init()` schedules once something new is armed, run in ScrollTrigger's safe mode: about 200 ms later, and only once the page has stopped scrolling. A smooth scroll in progress (`scroll-behavior: smooth`, a scroll-to tween, Lenis) or a landing on a `#hash` link carries on undisturbed. That also means `refresh()` returns before the positions have changed. If you need them recomputed at once, call `ScrollTrigger.refresh()` yourself.
+The refresh after `refresh()`, and the one `init()` schedules once something new is armed, run in ScrollTrigger's safe mode: about 200 ms later, and only once the page has stopped scrolling. A smooth scroll in progress (`scroll-behavior: smooth`, a scroll-to tween, Lenis) or a landing on a `#hash` link carries on undisturbed.
+
+`refresh()` returns a promise that resolves once the refresh has run, so `await reveal.refresh()` before you measure anything that depends on the new positions. Calls in the same frame share one promise. With no reveals on the page there's nothing to refresh, and it resolves straight away. While the tab is hidden the browser runs no animation frames, so the promise waits until the tab is visible again. If you need the positions recomputed at once, call `ScrollTrigger.refresh()` yourself.
 
 ### `destroy(container?, options?)`
 
-With no argument, kills all tweens + ScrollTriggers, reverts SplitText, and forgets every element — a later `init()` re-runs the whole page. Pass a `container` to tear down only the reveals on or inside it; those elements are forgotten too, so re-adding content there and calling `init()` re-animates just that subtree. `contains` works on detached nodes, so you can pass a subtree you're about to remove. Use the scoped form for SPA partial swaps, the bare form for a full route change.
+With no argument, kills the instance's tweens and ScrollTriggers, reverts its SplitText, and forgets every element — a later `init()` re-runs the whole page. Pass a `container` to tear down only the reveals on or inside it; those elements are forgotten too, so re-adding content there and calling `init()` re-animates just that subtree. `contains` works on detached nodes, so you can pass a subtree you're about to remove. Use the scoped form for SPA partial swaps, the bare form for a full route change.
 
 By default `destroy()` puts every element it tears down back as it was before `init()`. The props reveals animate (`opacity`, `transform`, `clip-path`, `filter`) go back to their values from before `init()`, on the element and on children the type changed (`batch` items). Any other inline style, such as one your own code set since, stays. An element that hadn't revealed yet shows as written instead of staying hidden in its starting state, and a counter shows the number it counts to, whether or not it got there. Each element keeps `data-reveal-state`, so `reveal.css` doesn't hide it again, and if a pre-hide rule of your own would, it gets `opacity: 1`.
 
 Pass `{ revert: false }` to leave the reveals' inline styles where they are, for example when you're about to remove or replace the elements anyway. Calling `init()` on such an element later reads whatever is still inline as the element's own style, so an element that hadn't revealed yet starts from its old starting state as if that were its resting place. Use the default if you plan to `init()` it again.
 
+`destroy({ revert: false })` is the same as `destroy(undefined, { revert: false })`.
+
+Each instance tears down only the reveals it armed. If two scripts on a page each create an instance, one of them calling `destroy()` leaves the other's reveals waiting to play. An element one instance has armed isn't armed again by another, even one with the same type, and that holds across separately bundled copies of the package. Once an instance lets go of its elements with a bare `destroy()`, though, another instance's next `init()` can arm them, so content the visitor has already seen animates in again. Scope `destroy(container)` to the content you're replacing to avoid that.
+
+A play-once reveal lets go of everything it held once it finishes, because it has already handed its styles back, so `destroy()` has nothing left to do for it. Content removed before it revealed is different: its reveal is still waiting, so call `destroy(container)` on it, or its tweens and ScrollTriggers stay in memory. Reveals with `data-reveal-reverse` or `data-reveal-keep` stay until `destroy()`.
+
 `destroy()` also covers an `init()` that is still loading types. That call skips the elements you destroyed, so `init(); destroy(); init()` arms each element once. An element removed from the page while its type loads isn't armed either, and a later `init()` picks it up if it comes back. A subtree that was never on the page, such as a card you call `init(card)` on just before inserting it, is armed as usual.
+
+### `data-reveal-state`
+
+`init()` sets it on every element it reaches, and a play-once reveal updates it when it finishes:
+
+| Value | Meaning |
+|-------|---------|
+| `ready` | Its type took over. The reveal is waiting, playing, or plays again on every scroll back (`data-reveal-reverse`, `parallax`). |
+| `done` | A play-once reveal has finished and handed its styles back, or kept them with `data-reveal-keep`. A `counter` is done when its count ends, a `split` once its own HTML is back, and a `batch` once its last item has finished. Under reduced motion, play-once reveals are done straight away. |
+| `skipped` | No type is registered under that name. |
+| `failed` | The type's module didn't load or its init threw. |
+
+More values may come later, so test for the attribute being there, as `reveal.css` does, rather than for one value. To style finished elements, use `[data-reveal-state="done"]`.
 
 ## Defaults
 
