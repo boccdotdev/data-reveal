@@ -65,6 +65,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "npm run build && playwright test",
+    "test:all": "npm test && npm run test:e2e",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -88,8 +91,13 @@
     "gsap": ">=3.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "gsap": "^3.13.0",
+    "happy-dom": "^21.0.3",
+    "postcss": "^8.5.30",
+    "postcss-import": "^16.2.0",
     "tsup": "^8.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.12"
   }
 }

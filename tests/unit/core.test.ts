@@ -1,0 +1,478 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RevealInit } from "../../src/internal/types";
+import { deferred, el, fakeType, html, loadCore, settle, state } from "./helpers";
+
+const scrollTrigger = { refresh: vi.fn(), fail: false };
+
+// Frames queue up here instead of running, so a refresh one test schedules
+// can't land in another, and a test runs them when it's ready.
+let frames: FrameRequestCallback[] = [];
+function runFrames(): void {
+  const queued = frames;
+  frames = [];
+  queued.forEach((callback) => callback(0));
+}
+
+beforeEach(() => {
+  scrollTrigger.refresh.mockClear();
+  scrollTrigger.fail = false;
+  // Registered per test, so a module one test loaded isn't reused by the next.
+  vi.doMock("gsap/ScrollTrigger", () => {
+    if (scrollTrigger.fail) throw new Error("ScrollTrigger chunk is gone");
+    return { ScrollTrigger: { refresh: scrollTrigger.refresh } };
+  });
+  frames = [];
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+  document.head.innerHTML = "";
+  document.body.innerHTML = "";
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("init()", () => {
+  it("marks every element it handles ready, skipped or failed", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const chunkError = new Error("chunk failed");
+    const reveal = createRevealCore((type) => {
+      if (type === "fade") return fade.init;
+      if (type === "broken") return Promise.reject(chunkError);
+      return null;
+    });
+    html(`
+      <div id="ready" data-reveal="fade"></div>
+      <div id="unknown" data-reveal="nope"></div>
+      <div id="bare" data-reveal></div>
+      <div id="broken" data-reveal="broken"></div>
+    `);
+
+    await expect(reveal.init()).rejects.toBe(chunkError);
+    expect(state("ready")).toBe("ready");
+    expect(state("unknown")).toBe("skipped");
+    expect(state("bare")).toBe("skipped");
+    expect(state("broken")).toBe("failed");
+  });
+
+  it("arms each element once, however often it's called", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const resolve = vi.fn(() => fade.init);
+    const reveal = createRevealCore(resolve);
+    html(`<div id="a" data-reveal="fade"></div>`);
+
+    await reveal.init();
+    await reveal.init();
+    expect(fade.armed).toEqual([el("a")]);
+    expect(resolve).toHaveBeenCalledTimes(1);
+
+    document.body.insertAdjacentHTML("beforeend", `<div id="b" data-reveal="fade"></div>`);
+    await reveal.init();
+    expect(fade.armed).toEqual([el("a"), el("b")]);
+  });
+
+  it("passes reduced motion through to each type", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { createRevealCore } = await loadCore();
+    const init = vi.fn<RevealInit>();
+    const reveal = createRevealCore(() => init);
+    html(`<div id="a" data-reveal="fade"></div>`);
+
+    await reveal.init();
+    expect(init).toHaveBeenCalledWith(el("a"), { reduced: true });
+  });
+
+  it("arms each type as soon as it resolves", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const split = fakeType(registry);
+    const slow = deferred<RevealInit>();
+    const reveal = createRevealCore((type) => (type === "split" ? slow.promise : fade.init));
+    html(`<h2 id="slow" data-reveal="split"></h2><div id="fast" data-reveal="fade"></div>`);
+
+    let settled = false;
+    const done = reveal.init().then(() => (settled = true));
+    await settle();
+    expect(state("fast")).toBe("ready");
+    expect(state("slow")).toBeNull();
+    expect(settled).toBe(false);
+
+    slow.resolve(split.init);
+    await done;
+    expect(state("slow")).toBe("ready");
+  });
+
+  it("runs the other types when one fails, then rejects with the first error in DOM order", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const slow = deferred<RevealInit>();
+    const firstError = new Error("first");
+    const secondError = new Error("second");
+    const reveal = createRevealCore((type) => {
+      if (type === "slow") return slow.promise;
+      if (type === "first") return Promise.reject(firstError);
+      if (type === "second") return Promise.reject(secondError);
+      return fade.init;
+    });
+    html(`
+      <div id="fast" data-reveal="fade"></div>
+      <div id="slow" data-reveal="slow"></div>
+      <div id="first" data-reveal="first"></div>
+      <div id="second" data-reveal="second"></div>
+    `);
+
+    let outcome: unknown = "pending";
+    const done = reveal.init().then(
+      () => (outcome = "resolved"),
+      (error) => (outcome = error),
+    );
+    await settle();
+    expect(state("fast")).toBe("ready");
+    expect(state("first")).toBe("failed");
+    expect(state("second")).toBe("failed");
+    expect(outcome).toBe("pending");
+
+    slow.resolve(fade.init);
+    await done;
+    expect(state("slow")).toBe("ready");
+    expect(outcome).toBe(firstError);
+  });
+
+  it("releases failed elements so a later init() tries them again", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const chunkError = new Error("chunk failed");
+    const resolve = vi
+      .fn<(type: string) => Promise<RevealInit>>()
+      .mockRejectedValueOnce(chunkError)
+      .mockResolvedValue(fade.init);
+    const reveal = createRevealCore(resolve);
+    html(`<div id="a" data-reveal="fade"></div>`);
+
+    await expect(reveal.init()).rejects.toBe(chunkError);
+    expect(state("a")).toBe("failed");
+
+    await reveal.init();
+    expect(state("a")).toBe("ready");
+    expect(fade.armed).toEqual([el("a")]);
+  });
+
+  it("doesn't overwrite another instance's state with skipped", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const split = fakeType(registry);
+    const fadeOnly = createRevealCore((type) => (type === "fade" ? fade.init : null));
+    const splitOnly = createRevealCore((type) => (type === "split" ? split.init : null));
+    html(`<div id="a" data-reveal="fade"></div><h2 id="b" data-reveal="split"></h2>`);
+
+    await splitOnly.init();
+    await fadeOnly.init();
+    expect(state("a")).toBe("ready");
+    expect(state("b")).toBe("ready");
+  });
+
+  it("includes the container itself (#10)", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const reveal = createRevealCore(() => fade.init);
+    html(`<section id="card" data-reveal="fade"><p id="inner" data-reveal="fade"></p></section>`);
+
+    await reveal.init(el("card"));
+    expect(fade.armed).toEqual([el("card"), el("inner")]);
+    expect(state("card")).toBe("ready");
+  });
+});
+
+describe("init() when a type's init throws", () => {
+  it("undoes that element's registered work and inline styles, and leaves nested reveals running", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const thrown = new Error("init threw");
+    const order: string[] = [];
+    const killThrowing = vi.fn();
+    const throwing: RevealInit = (target) => {
+      order.push(`throwing:${target.id}`);
+      registry.add(target, { kill: killThrowing });
+      target.style.opacity = "0";
+      target.style.transform = "translateY(20px)";
+      throw thrown;
+    };
+    const reveal = createRevealCore((type) => (type === "boom" ? throwing : fade.init));
+    const fadeInit = fade.init;
+    fade.init = (target, ctx) => {
+      order.push(`fade:${target.id}`);
+      fadeInit(target, ctx);
+    };
+    html(`
+      <div id="first" data-reveal="fade"></div>
+      <div id="outer" data-reveal="boom" style="color: red;">
+        <div id="inner" data-reveal="fade"></div>
+      </div>
+      <div id="after" data-reveal="fade"></div>
+    `);
+
+    await expect(reveal.init()).rejects.toBe(thrown);
+    // The nested reveal was armed before its parent threw.
+    expect(order).toEqual(["fade:first", "fade:inner", "fade:after", "throwing:outer"]);
+    expect(killThrowing).toHaveBeenCalledTimes(1);
+    expect(fade.kills.get(el("inner"))).not.toHaveBeenCalled();
+    expect(el("outer").getAttribute("style")).toBe("color: red;");
+    expect(state("outer")).toBe("failed");
+    expect(state("inner")).toBe("ready");
+    expect(state("after")).toBe("ready");
+  });
+
+  it("removes a style attribute the element didn't have", async () => {
+    const { createRevealCore } = await loadCore();
+    const reveal = createRevealCore(() => (target) => {
+      target.style.opacity = "0";
+      throw new Error("init threw");
+    });
+    html(`<div id="a" data-reveal="fade"></div>`);
+
+    await expect(reveal.init()).rejects.toThrow("init threw");
+    expect(el("a").hasAttribute("style")).toBe(false);
+  });
+});
+
+describe("destroy() during a pending init() (#11)", () => {
+  it("init(); destroy(); init() arms each element once", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const load = deferred<RevealInit>();
+    const reveal = createRevealCore(() => load.promise);
+    html(`<div id="a" data-reveal="fade"></div><div id="b" data-reveal="fade"></div>`);
+
+    const first = reveal.init();
+    reveal.destroy();
+    const second = reveal.init();
+    load.resolve(fade.init);
+    await Promise.all([first, second]);
+    expect(fade.armed).toEqual([el("a"), el("b")]);
+  });
+
+  it("drops the destroyed subtree from the pending call, and init() can arm it later", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const load = deferred<RevealInit>();
+    const reveal = createRevealCore(() => load.promise);
+    html(`<section id="swap"><div id="inside" data-reveal="fade"></div></section><div id="outside" data-reveal="fade"></div>`);
+
+    const pending = reveal.init();
+    reveal.destroy(el("swap"));
+    load.resolve(fade.init);
+    await pending;
+    expect(fade.armed).toEqual([el("outside")]);
+    expect(state("inside")).toBeNull();
+
+    await reveal.init(el("swap"));
+    expect(fade.armed).toEqual([el("outside"), el("inside")]);
+  });
+
+  it("doesn't let a stale call release the claim a newer call made", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const staleLoad = deferred<RevealInit>();
+    const chunkError = new Error("stale chunk failed");
+    const resolve = vi
+      .fn<(type: string) => Promise<RevealInit> | RevealInit>()
+      .mockReturnValueOnce(staleLoad.promise)
+      .mockReturnValue(fade.init);
+    const reveal = createRevealCore(resolve);
+    html(`<div id="a" data-reveal="fade"></div>`);
+
+    const stale = reveal.init().catch((error: unknown) => error);
+    reveal.destroy();
+    await reveal.init();
+    expect(state("a")).toBe("ready");
+
+    staleLoad.reject(chunkError);
+    expect(await stale).toBe(chunkError);
+    expect(state("a")).toBe("ready");
+
+    await reveal.init();
+    expect(fade.armed).toEqual([el("a")]);
+  });
+});
+
+describe("init() and the page", () => {
+  it("arms a detached subtree, so init() can run before it's inserted", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const reveal = createRevealCore(() => fade.init);
+    const card = document.createElement("div");
+    card.id = "card";
+    card.dataset.reveal = "fade";
+
+    await reveal.init(card);
+    document.body.append(card);
+    expect(fade.armed).toEqual([card]);
+    expect(state("card")).toBe("ready");
+
+    await reveal.init();
+    expect(fade.armed).toEqual([card]);
+  });
+
+  it("skips an element removed while its type loads, and arms it once it's back", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const load = deferred<RevealInit>();
+    const resolve = vi.fn().mockReturnValueOnce(load.promise).mockReturnValue(fade.init);
+    const reveal = createRevealCore(resolve);
+    html(`<div id="a" data-reveal="fade"></div><div id="b" data-reveal="fade"></div>`);
+    const b = el("b");
+
+    const pending = reveal.init();
+    b.remove();
+    load.resolve(fade.init);
+    await pending;
+    expect(fade.armed).toEqual([el("a")]);
+    expect(b.hasAttribute("data-reveal-state")).toBe(false);
+
+    document.body.append(b);
+    await reveal.init();
+    expect(fade.armed).toEqual([el("a"), b]);
+  });
+
+  it("resolves without waiting for elements an earlier call is still loading", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const resolve = vi.fn((type: string) => (type === "split" ? new Promise<RevealInit>(() => {}) : fade.init));
+    const reveal = createRevealCore(resolve);
+    html(`<h2 id="hung" data-reveal="split"></h2>`);
+
+    void reveal.init();
+    document.body.insertAdjacentHTML("beforeend", `<div id="added" data-reveal="fade"></div>`);
+    const outcome = await Promise.race([
+      reveal.init().then(() => "resolved"),
+      settle(200).then(() => "still waiting"),
+    ]);
+    expect(outcome).toBe("resolved");
+    expect(state("added")).toBe("ready");
+    // The hung element still belongs to the first call.
+    expect(resolve).toHaveBeenCalledTimes(2);
+    expect(state("hung")).toBeNull();
+  });
+});
+
+describe("visibility under a site's own pre-hide", () => {
+  beforeEach(() => {
+    document.head.innerHTML = `<style>[data-reveal] { opacity: 0; } .muted { opacity: 0.6; }</style>`;
+  });
+
+  it("shows skipped and failed elements", async () => {
+    const { createRevealCore } = await loadCore();
+    const reveal = createRevealCore((type) => {
+      if (type === "broken") return Promise.reject(new Error("chunk failed"));
+      if (type === "boom") {
+        return () => {
+          throw new Error("init threw");
+        };
+      }
+      return null;
+    });
+    html(`
+      <div id="skipped" data-reveal="nope"></div>
+      <div id="failed-load" data-reveal="broken"></div>
+      <div id="failed-init" data-reveal="boom"></div>
+      <div id="muted" class="muted" data-reveal="nope"></div>
+    `);
+
+    await reveal.init().catch(() => {});
+    expect(getComputedStyle(el("skipped")).opacity).toBe("1");
+    expect(getComputedStyle(el("failed-load")).opacity).toBe("1");
+    expect(getComputedStyle(el("failed-init")).opacity).toBe("1");
+    // Its own opacity isn't 0, so it's left alone.
+    expect(el("muted").style.opacity).toBe("");
+  });
+});
+
+describe("destroy()", () => {
+  it("with a container, kills only that subtree and lets init() re-arm it", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const reveal = createRevealCore(() => fade.init);
+    html(`<section id="swap" data-reveal="fade"><div id="inside" data-reveal="fade"></div></section><div id="outside" data-reveal="fade"></div>`);
+    await reveal.init();
+    const [swap, inside, outside] = [el("swap"), el("inside"), el("outside")];
+
+    reveal.destroy(swap);
+    expect(fade.kills.get(swap)).toHaveBeenCalledTimes(1);
+    expect(fade.kills.get(inside)).toHaveBeenCalledTimes(1);
+    expect(fade.kills.get(outside)).not.toHaveBeenCalled();
+    // The state stays, so reveal.css doesn't hide torn-down content.
+    expect(state("inside")).toBe("ready");
+
+    await reveal.init();
+    expect(fade.armed).toEqual([swap, inside, outside, swap, inside]);
+  });
+
+  it("with no argument, kills everything and forgets every element", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const reveal = createRevealCore(() => fade.init);
+    html(`<div id="a" data-reveal="fade"></div><div id="b" data-reveal="fade"></div>`);
+    await reveal.init();
+
+    reveal.destroy();
+    expect(fade.kills.get(el("a"))).toHaveBeenCalledTimes(1);
+    expect(fade.kills.get(el("b"))).toHaveBeenCalledTimes(1);
+
+    await reveal.init();
+    expect(fade.armed).toEqual([el("a"), el("b"), el("a"), el("b")]);
+  });
+});
+
+describe("refresh", () => {
+  it("is scheduled only once an element became ready", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const fade = fakeType(registry);
+    const reveal = createRevealCore((type) => (type === "fade" ? fade.init : null));
+    html(`<div id="skipped" data-reveal="nope"></div>`);
+
+    await reveal.init();
+    // A refresh would import ScrollTrigger first. Once this import is back,
+    // one the core had started would be too.
+    await import("gsap/ScrollTrigger");
+    await settle();
+    expect(frames).toHaveLength(0);
+
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      `<div id="a" data-reveal="fade"></div><div id="b" data-reveal="fade"></div>`,
+    );
+    await reveal.init();
+    reveal.refresh();
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+    runFrames();
+    // Coalesced into one call per frame.
+    expect(scrollTrigger.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("survives ScrollTrigger failing to load, and works once it can", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      scrollTrigger.fail = true;
+      const { createRevealCore, registry } = await loadCore();
+      const fade = fakeType(registry);
+      const reveal = createRevealCore(() => fade.init);
+      html(`<div id="a" data-reveal="fade"></div>`);
+
+      await reveal.init();
+      await expect(import("gsap/ScrollTrigger")).rejects.toThrow();
+      await settle();
+      expect(unhandled).not.toHaveBeenCalled();
+      expect(frames).toHaveLength(0);
+
+      scrollTrigger.fail = false;
+      reveal.refresh();
+      await vi.waitFor(() => expect(frames).toHaveLength(1));
+      runFrames();
+      expect(scrollTrigger.refresh).toHaveBeenCalledTimes(1);
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
+});

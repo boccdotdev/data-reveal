@@ -1,5 +1,6 @@
 import { prefersReducedMotion } from "./reducedMotion.js";
 import { registry } from "./registry.js";
+import { unhide } from "./visibility.js";
 import type { RevealInit } from "../internal/types.js";
 
 // Maps a `data-reveal` type string to its init, or null if the type isn't
@@ -39,13 +40,16 @@ function setState(el: HTMLElement, state: RevealState): void {
   el.setAttribute("data-reveal-state", state);
 }
 
-// Each init() call claims its elements, one claim per type. A claim that is
-// no longer the element's current one means destroy() ran (or a later init()
-// took the element over) while the type was loading, so the call leaves that
-// element alone. `settled` lets another init() wait for elements this one is
-// still loading instead of returning before they're armed.
-interface Claim {
-  settled: Promise<unknown[]>;
+// What one init() call knows about the elements it scanned.
+interface Scan {
+  // The call's claim token. An element whose claim is no longer this one was
+  // destroyed, or taken over by a later init(), while its type loaded.
+  claim: object;
+  // Elements that were on the page when scanned. One that has left since was
+  // removed while its type loaded. One that never was (init() on a detached
+  // subtree that is about to be inserted) is armed as usual.
+  connected: Set<Element>;
+  reduced: boolean;
 }
 
 export interface RevealInstance {
@@ -56,7 +60,8 @@ export interface RevealInstance {
    * runs as soon as its module arrives. If a type fails to load, the other
    * types still run, the failed elements are left for a later call to try
    * again, and the promise rejects with the first error once every type has
-   * settled.
+   * settled. Only the elements this call claims are waited for: ones an
+   * earlier, still-loading call claimed belong to that call.
    */
   init(container?: ParentNode): Promise<void>;
   /**
@@ -85,16 +90,11 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
   // Elements already claimed by an init() call, so init() is safe to call
   // repeatedly as the DOM grows (e.g. infinite scroll) without re-animating
   // existing elements.
-  let claims = new WeakMap<Element, Claim>();
+  let claims = new WeakMap<Element, object>();
 
   // Resolve one type and run it on its elements. Resolves with the errors
   // rather than rejecting, so init() can let every type settle first.
-  async function arm(
-    type: string,
-    elements: HTMLElement[],
-    claim: Claim,
-    reduced: boolean,
-  ): Promise<unknown[]> {
+  async function arm(type: string, elements: HTMLElement[], scan: Scan): Promise<unknown[]> {
     const errors: unknown[] = [];
     let init: RevealInit | null = null;
     let loaded = true;
@@ -109,13 +109,14 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
     const fail = (el: HTMLElement): void => {
       claims.delete(el);
       setState(el, "failed");
+      unhide(el);
     };
 
     let armed = false;
     for (const el of elements) {
       // destroy() ran, or a later init() took the element over, meanwhile.
-      if (claims.get(el) !== claim) continue;
-      if (!el.isConnected) {
+      if (claims.get(el) !== scan.claim) continue;
+      if (scan.connected.has(el) && !el.isConnected) {
         claims.delete(el);
         continue;
       }
@@ -126,7 +127,10 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
       if (!init) {
         // Another instance may have this type registered and already be
         // handling the element, so don't overwrite its state.
-        if (!el.hasAttribute("data-reveal-state")) setState(el, "skipped");
+        if (!el.hasAttribute("data-reveal-state")) {
+          setState(el, "skipped");
+          unhide(el);
+        }
         continue;
       }
       // Set first, so reveal.css lets go before the type looks at the
@@ -134,12 +138,13 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
       setState(el, "ready");
       const style = el.getAttribute("style");
       try {
-        init(el, { reduced });
+        init(el, { reduced: scan.reduced });
         armed = true;
       } catch (error) {
         errors.push(error);
-        // Undo whatever the init got through before it threw: its tweens,
-        // triggers and splits, and the inline styles it set.
+        // Undo what the init got through before it threw: the tweens,
+        // triggers and splits it registered for this element, and the
+        // element's own inline styles. Children's styles aren't restored.
         registry.killElement(el);
         if (style === null) el.removeAttribute("style");
         else el.setAttribute("style", style);
@@ -153,22 +158,19 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
 
   return {
     async init(container: ParentNode = document): Promise<void> {
-      const reduced = prefersReducedMotion();
       const found = Array.from(container.querySelectorAll<HTMLElement>("[data-reveal]"));
       if (container instanceof Element && container.matches("[data-reveal]")) {
         found.unshift(container as HTMLElement);
       }
+      const scan: Scan = { claim: {}, connected: new Set(), reduced: prefersReducedMotion() };
 
-      // Group the unclaimed elements by type, reading each type once. An
-      // element an earlier call is still loading is waited on, not re-armed.
+      // Claim the unclaimed elements and group them by type, reading each
+      // type once. Elements an earlier call claimed are that call's to arm.
       const groups = new Map<string, HTMLElement[]>();
-      const pending = new Set<Promise<unknown>>();
       for (const el of found) {
-        const claim = claims.get(el);
-        if (claim) {
-          pending.add(claim.settled);
-          continue;
-        }
+        if (claims.has(el)) continue;
+        claims.set(el, scan.claim);
+        if (el.isConnected) scan.connected.add(el);
         const type = el.dataset.reveal ?? "";
         const group = groups.get(type);
         if (group) group.push(el);
@@ -177,14 +179,9 @@ export function createRevealCore(resolve: RevealResolver): RevealInstance {
 
       // Each type is armed as soon as it resolves, so one slow or failed
       // chunk doesn't hold back the rest.
-      const settling = Array.from(groups, ([type, elements]) => {
-        const claim = {} as Claim;
-        elements.forEach((el) => claims.set(el, claim));
-        claim.settled = arm(type, elements, claim, reduced);
-        return claim.settled;
-      });
-
-      const [errors] = await Promise.all([Promise.all(settling), Promise.all(pending)]);
+      const errors = await Promise.all(
+        Array.from(groups, ([type, elements]) => arm(type, elements, scan)),
+      );
       // Every type has settled, so it's now safe to reject: callers' .catch()
       // still hears about the failure.
       const first = errors.find((typeErrors) => typeErrors.length > 0);

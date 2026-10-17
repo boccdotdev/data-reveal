@@ -1,0 +1,31 @@
+body {
+  margin: 0;
+  padding: 16px;
+  font: 16px/1.4 system-ui, sans-serif;
+}
+
+.box {
+  min-height: 32px;
+  margin: 8px 0;
+  padding: 4px 8px;
+  background: #ddd;
+}
+
+h2 {
+  margin: 8px 0;
+}
+
+/* Puts each reveal a screen apart, so it only triggers once scrolled to. */
+.gap {
+  height: 120vh;
+}
+
+.muted {
+  opacity: 0.6;
+}
+
+/* Like Tailwind's `transition` utility. */
+.fades {
+  transition-property: opacity, transform;
+  transition-duration: 300ms;
+}

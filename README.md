@@ -51,7 +51,7 @@ The file sits at the package root, so `postcss-import` (as in Tailwind v3 setups
 
 It only hides content while that's safe:
 
-- Only on screen, while JavaScript is on and the visitor hasn't asked for reduced motion. Printing never hides anything. Browsers without the `scripting` media feature (Safari before 17, Chrome before 120, Firefox before 113) skip the rule, so their visitors can see the flash but never a blank page.
+- Only on screen, while JavaScript is on and the visitor hasn't asked for reduced motion. The stylesheet never hides anything in print, though an element a type has already set to its hidden starting state, such as a fade below the fold, still prints blank for now. Browsers without the `scripting` media feature (Safari before 17, Chrome before 120, Firefox before 113) skip the rule, so their visitors can see the flash but never a blank page.
 - Only until `init()` handles the element. `init()` sets `data-reveal-state` on every element it reaches: `ready` when its type took over, `skipped` when no type is registered under that name, and `failed` when the type's module didn't load or its init threw. The stylesheet lets go in all three cases.
 - If your script never runs, a CSS failsafe shows the content after 5 seconds. Change the delay with a custom property. The value needs a time unit, like `3s` or `3000ms`. Anything else, `0` included, shows the content straight away.
 
@@ -65,7 +65,7 @@ Import the stylesheet from CSS that loads in `<head>`. Imported from JavaScript,
 
 The failsafe is a CSS animation on each waiting element, so it competes with any `animation` rule of your own that matches the same element. If yours wins the cascade, the failsafe never runs and the element stays hidden on a page whose script fails. If the failsafe wins, your animation waits until `init()` reaches the element.
 
-`destroy()` leaves `data-reveal-state` in place on purpose, so the stylesheet doesn't hide content you've torn down.
+`destroy()` leaves `data-reveal-state` in place on purpose, so the stylesheet doesn't hide content you've torn down. An element destroyed while its type was still loading never got a state, so the stylesheet keeps hiding it until `init()` reaches it again or the failsafe fires.
 
 ### Writing your own rule
 
@@ -85,7 +85,7 @@ Copy `reveal.css` rather than writing a shorter rule. Keep all three parts: the 
 }
 ```
 
-If you keep an older rule that hides every `[data-reveal]`, each type still shows its element once it runs. `counter`, `parallax`, `clip` and the `split` and `batch` containers don't animate their own opacity, so they set it to 1 only if it computes to 0 when they start, and otherwise keep the opacity your CSS gives them. Skipped and failed elements stay hidden under a rule like that.
+If you keep an older rule that hides every `[data-reveal]`, every element still ends up visible once `init()` reaches it. Types that animate opacity end at 1. `counter`, `parallax`, `clip` and the `split` and `batch` containers don't animate their own opacity, and skipped and failed elements aren't animated at all. For those, `init()` sets the opacity to 1 only if it would otherwise settle at 0, so an opacity your CSS sets on purpose stays.
 
 ## Minimal builds (manual registration)
 
@@ -122,11 +122,11 @@ reveal.destroy(myContainer);      // kill + forget only reveals on/inside myCont
 
 `init()` is idempotent — already-initialized elements are skipped, so you can safely call it again as new content is added (e.g. infinite scroll).
 
-If a type's module fails to load, or its init throws on an element, `init()` still runs every other type, marks the affected elements `data-reveal-state="failed"`, and rejects with the first error once every type has settled. A failed element shows without its animation if your pre-hide CSS is keyed on the state, as `reveal.css` is. Anything the type set up on it before throwing is undone.
+If a type's module fails to load, or its init throws on an element, `init()` still runs every other type, marks the affected elements `data-reveal-state="failed"`, and rejects with the first error once every type has settled. A failed element shows without its animation. When a type's init throws, the tweens, ScrollTriggers and SplitText it had registered on that element are killed, and the element's `style` attribute goes back to what it was. Inline styles on its children, and anything the type didn't register, stay as they are.
 
-Failed elements are also released, so a later `init()` tries them again. Whether that works depends on the loader. A browser keeps a failed native `import()` for the life of the page, so in auto mode without a bundler the retry fails the same way until a reload. Loaders that fetch again, such as webpack's, can recover, and a type whose init threw simply runs again.
+Failed elements are also released, so a later `init()` tries them again. Whether that works depends on the loader. Browsers keep a failed native `import()` for the life of the page, and Vite, Rollup and esbuild output all load chunks with native `import()`, so there the retry fails the same way until a reload. Loaders that fetch again, such as webpack's, can recover, and a type whose init threw simply runs again.
 
-If an earlier `init()` call is still loading some of the elements a new call covers, the new call waits for them, so by the time it resolves every element it covers has been handled.
+Each call waits only for the elements it claims. If an earlier call is still loading some of the same elements, they stay with that call: the new call doesn't arm them again and doesn't wait for them, so one stuck chunk can't hold up later calls. Await the earlier call too if you need those elements armed.
 
 ### `refresh()`
 
@@ -136,7 +136,7 @@ Recomputes every ScrollTrigger's start/end positions. ScrollTrigger already refr
 
 With no argument, kills all tweens + ScrollTriggers, reverts SplitText, and forgets every element — a later `init()` re-runs the whole page. Pass a `container` to tear down only the reveals on or inside it; those elements are forgotten too, so re-adding content there and calling `init()` re-animates just that subtree. `contains` works on detached nodes, so you can pass a subtree you're about to remove. Use the scoped form for SPA partial swaps, the bare form for a full route change.
 
-`destroy()` also covers an `init()` that is still loading types. That call skips the elements you destroyed, so `init(); destroy(); init()` arms each element once. An element removed from the page while its type loads isn't armed either, and a later `init()` picks it up if it comes back.
+`destroy()` also covers an `init()` that is still loading types. That call skips the elements you destroyed, so `init(); destroy(); init()` arms each element once. An element removed from the page while its type loads isn't armed either, and a later `init()` picks it up if it comes back. A subtree that was never on the page, such as a card you call `init(card)` on just before inserting it, is armed as usual.
 
 ## Animation types
 
@@ -236,6 +236,18 @@ Continuous, scroll-linked motion (scrubbed — not a one-shot reveal). Disabled 
 | `data-reveal-speed` | `0.3` | Higher = more movement |
 | `data-reveal-start` | `top bottom` | ScrollTrigger `start` |
 | `data-reveal-end` | `bottom top` | ScrollTrigger `end` |
+
+## Development
+
+```bash
+npm install
+npx playwright install   # browsers for the end-to-end tests, once
+npm test                 # unit tests: Vitest with happy-dom
+npm run test:e2e         # build, then Playwright in Chromium, Firefox and WebKit
+npm run test:all         # both
+```
+
+The unit tests in `tests/unit` cover the core and the registry with stand-in types. The end-to-end tests in `tests/e2e` load fixture pages from a small local server that can fail, delay or hold back any file, to act out a broken deploy or a slow network. GSAP comes from `node_modules`, so the tests don't need the internet. To run one browser, use `npx playwright test --project=chromium`.
 
 ## License
 

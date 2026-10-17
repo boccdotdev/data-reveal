@@ -1,8 +1,8 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
+import { unhide } from "../core/visibility.js";
 import { num } from "../internal/attrs.js";
-import { unhide } from "../internal/opacity.js";
 import { isReverse, revealStart } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
