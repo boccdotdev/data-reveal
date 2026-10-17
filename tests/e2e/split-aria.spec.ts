@@ -5,7 +5,7 @@ test.describe("split text and assistive tech", () => {
     await page.goto(fixtureUrl("split-aria"));
     expect(await initResult(page)).toBe("resolved");
     // Every split in this page keeps its pieces except #once.
-    await expect(page.locator("#para > div").first()).toBeAttached();
+    await expect(page.locator("#para .data-reveal-word").first()).toBeAttached();
   });
 
   test("chars are read as words, and the element keeps its role", async ({ page }) => {
@@ -44,7 +44,7 @@ test.describe("split text and assistive tech", () => {
     await expect(page.locator("#auto")).toHaveAttribute("aria-label", "Labelled by SplitText");
   });
 
-  test("copying a split that's waiting to play copies its text once", async ({ page, browserName }) => {
+  test("copying a split that's waiting to play copies its text once", async ({ page }) => {
     const waiting = page.locator("#waiting");
     await expect(waiting.locator('[aria-hidden="true"]').first()).toBeAttached();
     const copied = await waiting.evaluate((element) => {
@@ -52,10 +52,7 @@ test.describe("split text and assistive tech", () => {
       selection.selectAllChildren(element);
       return selection.toString();
     });
-    expect(copied.replace(/\s+/g, "")).toBe("Copythistextonce,please");
-    // Firefox puts each piece on a line of its own, copies or not: SplitText
-    // wraps the pieces in <div>s.
-    if (browserName !== "firefox") expect(copied).toBe("Copy this text once, please");
+    expect(copied).toBe("Copy this text once, please");
   });
 
   test("a finished play-once split leaves no copies or hidden pieces behind", async ({ page }) => {

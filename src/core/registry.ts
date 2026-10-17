@@ -29,6 +29,8 @@ interface Snapshot {
   attributes: Array<[name: string, value: string | null]>;
   // The text destroy() leaves, for types that rewrite it, like counter.
   text?: string;
+  // Run just before destroy() puts the target back (see resetOnRestore()).
+  reset?: () => void;
 }
 
 interface Entry {
@@ -36,9 +38,18 @@ interface Entry {
   killables: Killable[];
   revertables: Revertable[];
   snapshots: Snapshot[];
-  // The reveal has finished and handed everything back. It's dropped once
-  // every reveal it shares a snapshot with has too.
+  // The play-once reveal has finished, so it won't change its targets again.
   finished: boolean;
+  // It also handed everything back, so it can be dropped once every reveal
+  // it shares a snapshot with can too.
+  releasable: boolean;
+}
+
+// A reveal that left a target to another reveal, and what to do once that
+// one is done with it.
+interface Yielded {
+  el: Element;
+  done: () => void;
 }
 
 // Which entries a kill applies to, by the element each reveal is on: the
@@ -75,11 +86,13 @@ class RevealRegistry {
   // on the target starts, and removed when that tween completes, is
   // interrupted, or its reveal is killed.
   private running = new WeakMap<HTMLElement, Set<Element>>();
+  // The reveals that left each target to the one animating it (yieldTo()).
+  private yielded = new WeakMap<HTMLElement, Yielded[]>();
 
   private entryFor(el: Element): Entry {
     let entry = this.entries.get(el);
     if (!entry) {
-      entry = { el, killables: [], revertables: [], snapshots: [], finished: false };
+      entry = { el, killables: [], revertables: [], snapshots: [], finished: false, releasable: false };
       this.entries.set(el, entry);
     }
     return entry;
@@ -94,8 +107,20 @@ class RevealRegistry {
     this.entryFor(el).killables.push(trigger);
   }
 
-  addSplit(el: Element, split: Revertable): void {
-    this.entryFor(el).revertables.push(split);
+  /** Something to revert when the reveal on `el` is killed, such as its split. Never on release(). */
+  addRevert(el: Element, revertable: Revertable): void {
+    this.entryFor(el).revertables.push(revertable);
+  }
+
+  /**
+   * Run `reset` whenever destroy() or the throw path puts `target` back, just
+   * before its inline styles go back, so the engine can bring its own record
+   * of the target in line (GSAP's cached transform). Not when a finished
+   * reveal hands the props back: it ended where that record says.
+   */
+  resetOnRestore(target: HTMLElement, reset: () => void): void {
+    const snapshot = this.snapshotOf.get(target);
+    if (snapshot) snapshot.reset = reset;
   }
 
   track(el: Element, tween: Trackable): void {
@@ -165,11 +190,46 @@ class RevealRegistry {
     return (this.running.get(target)?.size ?? 0) > 0;
   }
 
+  /** Whether a reveal other than the one on `el` is animating `target` right now. */
+  animatedByOthers(el: Element, target: HTMLElement): boolean {
+    for (const other of this.running.get(target) ?? []) if (other !== el) return true;
+    return false;
+  }
+
+  /**
+   * The reveal on `el` leaves `target` to the reveal animating it, so the two
+   * don't fight over it. `done` runs once that one is done with it: after it
+   * has handed the props back (settle()), or once it's killed.
+   */
+  yieldTo(el: Element, target: HTMLElement, done: () => void): void {
+    let waiting = this.yielded.get(target);
+    if (!waiting) this.yielded.set(target, (waiting = []));
+    waiting.push({ el, done });
+  }
+
+  /** No reveal is animating `target` any more: finish the ones that yielded it. */
+  settle(target: HTMLElement): void {
+    const waiting = this.yielded.get(target);
+    if (!waiting) return;
+    this.yielded.delete(target);
+    waiting.forEach(({ done }) => done());
+  }
+
   /** Drop a tween the registry no longer needs to kill, e.g. one a re-split replaced. */
   forget(el: Element, tween: Trackable): void {
     const entry = this.entries.get(el);
     if (!entry) return;
     entry.killables = entry.killables.filter((k) => k !== tween && k !== tween.scrollTrigger);
+  }
+
+  /**
+   * The play-once reveal on `el` has finished, but keeps what it left inline
+   * (`keep`), so it stays for destroy() to put back. It no longer holds back
+   * putting a shared target back when another reveal on it is killed.
+   */
+  finished(el: Element): void {
+    const entry = this.entries.get(el);
+    if (entry) entry.finished = true;
   }
 
   /**
@@ -182,12 +242,12 @@ class RevealRegistry {
   release(el: Element): void {
     const entry = this.entries.get(el);
     if (!entry) return;
-    entry.finished = true;
+    entry.finished = entry.releasable = true;
     const group = new Set<Entry>();
     const pending = [entry];
     for (let next = pending.pop(); next; next = pending.pop()) {
       if (group.has(next)) continue;
-      if (!next.finished) return;
+      if (!next.releasable) return;
       group.add(next);
       for (const snapshot of next.snapshots) {
         for (const owner of snapshot.owners) {
@@ -269,20 +329,39 @@ class RevealRegistry {
     return killed.map((entry) => entry.el);
   }
 
+  // Whether another reveal on the snapshot's target is still to play or
+  // playing there: one not finished that hasn't yielded it. It hands the
+  // target back itself. A reveal already killed, finished or yielded doesn't
+  // count.
+  private pending(snapshot: Snapshot): boolean {
+    const yielded = this.yielded.get(snapshot.target) ?? [];
+    for (const owner of snapshot.owners) {
+      const entry = this.entries.get(owner);
+      if (entry && !entry.finished && !yielded.some((y) => y.el === owner)) return true;
+    }
+    return false;
+  }
+
   // Stop the animations first so nothing writes to the element afterwards,
   // then undo the split, then put back what the snapshots recorded.
   private killEntry(entry: Entry, restore: Restore): void {
     entry.killables.forEach((k) => k.kill());
     entry.revertables.forEach((r) => r.revert());
     for (const snapshot of entry.snapshots) {
+      const { target } = snapshot;
       snapshot.owners.delete(entry.el);
-      this.stopped(entry.el, snapshot.target);
-      // Another reveal is still animating the target and will hand it back
-      // when it finishes, or nothing is to be restored. A reveal that has
-      // already finished on it, or hasn't started, doesn't hold it back.
-      if (this.animating(snapshot.target) || restore === "none") continue;
-      if (snapshot.text !== undefined) snapshot.target.textContent = snapshot.text;
-      this.putBack(snapshot, restore);
+      this.stopped(entry.el, target);
+      const waiting = this.yielded.get(target);
+      if (waiting) this.yielded.set(target, waiting.filter((y) => y.el !== entry.el));
+      // Put the target back unless nothing is to be restored, or another
+      // reveal on it is animating it or still to play there (another
+      // instance's, say) and will hand it back itself.
+      if (restore !== "none" && !this.animating(target) && !this.pending(snapshot)) {
+        if (snapshot.text !== undefined) target.textContent = snapshot.text;
+        snapshot.reset?.();
+        this.putBack(snapshot, restore);
+      }
+      if (!this.animating(target)) this.settle(target);
     }
   }
 }

@@ -51,7 +51,7 @@ The file sits at the package root, so `postcss-import` (as in Tailwind v3 setups
 
 It only hides content while that's safe:
 
-- Only on screen, while JavaScript is on and the visitor hasn't asked for reduced motion. The stylesheet never hides anything in print, though an element a type has already set to its hidden starting state, such as a fade below the fold, still prints blank for now. Browsers without the `scripting` media feature (Safari before 17, Chrome before 120, Firefox before 113) skip the rule, so their visitors can see the flash but never a blank page.
+- Only on screen, while JavaScript is on and the visitor hasn't asked for reduced motion. The stylesheet never hides anything in print. Browsers without the `scripting` media feature (Safari before 17, Chrome before 120, Firefox before 113) skip the rule, so their visitors can see the flash but never a blank page.
 - Only until `init()` handles the element. `init()` sets [`data-reveal-state`](#data-reveal-state) on every element it reaches, whatever happens to it, and the stylesheet lets go as soon as the attribute is there.
 - If your script never runs, a CSS failsafe shows the content after 5 seconds. Change the delay with a custom property. The value needs a time unit, like `3s` or `3000ms`. Anything else, `0` included, shows the content straight away.
 
@@ -60,6 +60,8 @@ It only hides content while that's safe:
 ```
 
 `parallax` is never hidden, because it has no hidden starting state.
+
+It also has print rules. Nothing scrolls on paper, so a reveal still waiting below the fold, or partway through, would print blank or half shown. In print, every element whose reveal hasn't finished (`data-reveal-state="ready"`), the items of such a `batch` and `split`'s pieces drop the reveal's `opacity`, `transform`, `translate`, `rotate`, `scale`, `clip-path` and `filter`, so they print in full. That takes their own values of those properties with them, such as a `.muted` opacity, until the reveal has played. A finished reveal has already handed them back, so it prints as your CSS has it, and the rules touch nothing else on the page or its layout. A `counter` that hasn't counted yet prints the number it starts from.
 
 Import the stylesheet from CSS that loads in `<head>`. Imported from JavaScript, it can arrive too late to stop the flash.
 
@@ -150,7 +152,7 @@ Pass `{ revert: false }` to leave the reveals' inline styles where they are, for
 
 `destroy({ revert: false })` is the same as `destroy(undefined, { revert: false })`.
 
-Each instance tears down only the reveals it armed. If two scripts on a page each create an instance, one of them calling `destroy()` leaves the other's reveals waiting to play. An element one instance has armed isn't armed again by another, even one with the same type, and that holds across separately bundled copies of the package. Once an instance lets go of its elements with a bare `destroy()`, though, another instance's next `init()` can arm them, so content the visitor has already seen animates in again. Scope `destroy(container)` to the content you're replacing to avoid that.
+Each instance tears down only the reveals it armed. If two scripts on a page each create an instance, one of them calling `destroy()` leaves the other's reveals waiting to play. An element one instance has armed isn't armed again by another, even one with the same type, and that holds across separately bundled copies of the package. Once an instance lets go of its elements with a bare `destroy()`, though, another instance's next `init()` can arm them, so content the visitor has already seen animates in again. Scope `destroy(container)` to the content you're replacing to avoid that. An instance you drop without calling `destroy()` keeps its elements, and no other instance can arm them. A copy of 0.3 on the same page doesn't mark the elements it arms, so it can still arm the same elements as a 0.4 copy, and both animate them.
 
 A play-once reveal lets go of everything it held once it finishes, because it has already handed its styles back, so `destroy()` has nothing left to do for it. Content removed before it revealed is different: its reveal is still waiting, so call `destroy(container)` on it, or its tweens and ScrollTriggers stay in memory. Reveals with `data-reveal-reverse` or `data-reveal-keep` stay until `destroy()`.
 
@@ -249,6 +251,10 @@ When a play-once reveal finishes, it leaves nothing inline. The props it animate
 - at its own opacity, so a `.muted { opacity: 0.6 }` element ends at 0.6;
 - at its own transform, including the `translate`, `rotate` and `scale` properties that Tailwind v4's utilities set. `fade`, `slide`, `scale`, `rotate` and `batch` items start from that transform plus their own offset, so an element centred with `translateX(-50%)` stays centred while it slides in, and `scale`'s `from` is relative to the element's own scale.
 
+`init()` checks once whether an element's CSS sets `translate`, `rotate` or `scale`. If that changes later, say across a breakpoint, `destroy()` those elements and `init()` them again.
+
+An element can be a reveal of its own and a `batch` item at the same time. The first of the two to start animating it plays, and the other leaves the element alone and finishes with it, so it animates once.
+
 Before 0.4 the end state stayed inline, which got in the way:
 
 - Any transform, even `translate(0, 0)`, makes the element the containing block for `position: fixed` descendants, so a fixed overlay inside it scrolled with it.
@@ -294,6 +300,8 @@ How the text reaches screen readers depends on what it's split into:
 Set `data-reveal-aria`, or `aria` in `typeDefaults.split`, to change it.
 
 With `hidden`, the copies are in the page for as long as the element is split: until its reveal finishes, and for good with `data-reveal-reverse` or `data-reveal-keep`. They can't be selected, so copy and paste gets each word once. The element's `textContent` has every word twice, though, and the browser's find in page can match a word's copy as well as the word.
+
+The pieces are `<span>`s with the classes `data-reveal-char`, `data-reveal-word` and `data-reveal-line`, so style them with those. They're only in the page while the element is split.
 
 Splitting collapses white space, so line breaks that come from `white-space: pre-line` disappear while the element is split. Use `<br>` for line breaks in split text. Reduced motion doesn't split at all.
 

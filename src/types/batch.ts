@@ -3,6 +3,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
 import { revealCallbacks, revealed, revealedAtOnce } from "../internal/finish.js";
+import { capOpacity } from "../internal/opacity.js";
 import { option, options } from "../internal/options.js";
 import { ownTransform } from "../internal/transform.js";
 import { cleansUp, isReverse, revealStart } from "../internal/trigger.js";
@@ -44,19 +45,28 @@ export const init: RevealInit = (el, ctx) => {
       },
     }),
   };
-  // Every group's tween stays registered until it completes or `overwrite`
-  // interrupts it (its items entered or left again), so destroy() stops each
-  // group still animating.
+  // Every group's tween stays registered until it completes or is
+  // interrupted, so destroy() stops each group still animating. A new group
+  // takes its items over from this batch's own earlier tweens (they entered
+  // or left again), but never from another reveal's tween on an item, which
+  // GSAP's `overwrite` would kill: that one has to finish, so it's done.
+  const running = new Set<gsap.core.Tween>();
   const forget = function (this: gsap.core.Tween): void {
+    running.delete(this);
     registry.forget(el, this);
   };
-  const untilDone = { onComplete: forget, onInterrupt: forget };
+  const play = (group: Element[], vars: gsap.TweenVars): void => {
+    running.forEach((tween) => tween.kill(group));
+    const tween = gsap.to(group, { ...vars, duration, onComplete: forget, onInterrupt: forget });
+    running.add(tween);
+    registry.track(el, tween);
+  };
 
   unhide(el);
   // Each item ends at its own opacity and position, read before it's hidden.
   targets.forEach((item) => registry.snapshot(el, item));
   const opacities = new Map(targets.map((item) => [item, shownOpacity(item)]));
-  const ownY = new Map(targets.map((item) => [item, ownTransform(item, el).y]));
+  const ownY = new Map(targets.map((item) => [item, ownTransform(item).y]));
   const shown = {
     opacity: (_index: number, item: HTMLElement) => opacities.get(item) ?? 1,
     y: (_index: number, item: HTMLElement) => ownY.get(item) ?? 0,
@@ -71,29 +81,20 @@ export const init: RevealInit = (el, ctx) => {
   const triggers = ScrollTrigger.batch(targets, {
     start: revealStart(el, ctx),
     once: !reverse,
-    onEnter: (group) => {
-      const tween = gsap.to(group, {
+    onEnter: (group) =>
+      play(group, {
         ...shown,
-        duration,
+        modifiers: capOpacity((item) => opacities.get(item as HTMLElement) ?? 1),
         stagger: itemStagger,
         ease: ease ?? "back.out(1.4)",
-        overwrite: true,
-        ...untilDone,
-      });
-      registry.track(el, tween);
-    },
+      }),
     onLeaveBack: reverse
-      ? (group) => {
-          const tween = gsap.to(group, {
+      ? (group) =>
+          play(group, {
             ...hidden,
-            duration,
             stagger: { each: stagger, ...revealCallbacks(el, ctx, { cleanUp: false }) },
             ease: ease ?? "power2.in",
-            overwrite: true,
-            ...untilDone,
-          });
-          registry.track(el, tween);
-        }
+          })
       : undefined,
   });
 

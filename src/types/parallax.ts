@@ -3,7 +3,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
 import { options } from "../internal/options.js";
-import { watchTransform } from "../internal/transform.js";
+import { ownTransform } from "../internal/transform.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -24,7 +24,8 @@ export const init: RevealInit = (el, ctx) => {
   });
   const distance = speed * 100;
 
-  watchTransform(el);
+  // Not for its values: so destroy() leaves GSAP reading the element right.
+  ownTransform(el);
   const tween = gsap.fromTo(
     el,
     { yPercent: -distance },

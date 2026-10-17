@@ -6,7 +6,7 @@ test("destroy() mid-reveal, then init() again, leaves every batch item where its
   const items = page.locator("#list li");
   const opacityOf = (index: number) => items.nth(index).evaluate((item) => Number(getComputedStyle(item).opacity));
 
-  // The first group is partway through its two-second reveal when the second
+  // The first group is partway through its four-second reveal when the second
   // group enters.
   await expect.poll(() => opacityOf(0)).toBeGreaterThan(0);
   await page.evaluate(() => window.scrollBy(0, 200));

@@ -1,4 +1,4 @@
-import { expect, initResult, revealDone, scrollTo, test } from "./helpers";
+import { expect, finishedAt, initResult, instanceReady, revealDone, sampleReveal, scrollTo, test, twinBox } from "./helpers";
 
 test("two copies of the package with the same type arm each element once", async ({ page, fixtureUrl }) => {
   await page.goto(fixtureUrl("copies", { params: { mode: "manual", types: "fade", second: "fade", copy: "1" } }));
@@ -24,4 +24,28 @@ test("two copies of the package with the same type arm each element once", async
     await revealDone(target);
     await expect.poll(() => settled(id)).toEqual(await settled(`${id}-twin`));
   }
+});
+
+test("an element one copy armed and destroyed reveals from where its CSS puts it when the other copy arms it", async ({
+  page,
+  fixtureUrl,
+}) => {
+  await page.goto(
+    fixtureUrl("copies", { params: { mode: "manual", types: "fade", second: "fade", copy: "1", init: "0" } }),
+  );
+  // The harness creates the second instance first.
+  await instanceReady(page);
+  // The second copy arms the waiting fade, lets go of it, and the first takes it on.
+  await page.evaluate(async () => {
+    await window.__reveal.second?.init();
+    window.__reveal.second?.destroy();
+    await window.__reveal.instance?.init();
+  });
+
+  const samples = await sampleReveal(page, "plain");
+  const handed = finishedAt(samples);
+  expect(handed).toBeGreaterThan(0);
+  const [before, at] = [samples[handed - 1], samples[handed]];
+  expect(Math.abs(at.y - before.y), "jumped when the reveal finished").toBeLessThanOrEqual(1);
+  expect(Math.abs(samples[samples.length - 1].y - (await twinBox(page, "plain")).y)).toBeLessThanOrEqual(1);
 });

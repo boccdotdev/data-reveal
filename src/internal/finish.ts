@@ -17,6 +17,7 @@ type Callback = (this: gsap.core.Tween) => void;
 export function revealed(el: HTMLElement, { release }: { release: boolean }): void {
   setState(el, "done");
   if (release) registry.release(el);
+  else registry.finished(el);
 }
 
 /**
@@ -32,12 +33,16 @@ export function revealedAtOnce(el: HTMLElement, ctx: RevealContext): void {
  * object's, for one set per item). They tell the registry while the reveal on
  * `el` is animating its target, and when the tween completes they hand the
  * target's animated props back to its CSS if `cleanUp` asks for it (by
- * default unless `reverse` or `keep`) and no other reveal is still animating
- * it (a batch item that is also a fade). The target is `target`, or else the
- * tween's own target. Only the package's own reveal tweens count, so a site's
- * tween on the same element never holds the handback up. `onFinish` replaces
- * `finish()`, for a type with more to undo. Then, unless `reverse` plays it
- * again, `onDone` runs: by default it marks `el` done with revealed().
+ * default unless `reverse` or `keep`). The target is `target`, or else the
+ * tween's own target. `onFinish` replaces `finish()`, for a type with more to
+ * undo. Then, unless `reverse` plays it again, `onDone` runs: by default it
+ * marks `el` done with revealed().
+ *
+ * Two reveals on one element (a batch item that is also a fade) would fight
+ * over it, so the first to start animating it keeps it. A later one stops its
+ * own tween on it as it starts, and is done when the first is, after the
+ * handback. Only the package's own reveal tweens count, so a site's tween on
+ * the same element never holds anything up.
  */
 export function revealCallbacks(
   el: HTMLElement,
@@ -59,18 +64,33 @@ export function revealCallbacks(
   const stop: Callback = function () {
     registry.stopped(el, targetOf(this));
   };
+  const later = (done: HTMLElement) => () => {
+    if (once) onDone(done);
+  };
   return {
     onStart() {
-      registry.started(el, targetOf(this));
+      const target = targetOf(this);
+      if (registry.animatedByOthers(el, target)) {
+        this.kill();
+        registry.yieldTo(el, target, later(target));
+        return;
+      }
+      registry.started(el, target);
     },
     onComplete() {
       const done = targetOf(this);
       registry.stopped(el, done);
-      if (cleanUp && !registry.animating(done)) {
+      // Another reveal is still animating it, so that one hands it back.
+      if (registry.animating(done)) {
+        registry.yieldTo(el, done, later(done));
+        return;
+      }
+      if (cleanUp) {
         onFinish(done);
         uncache(done);
       }
       if (once) onDone(done);
+      registry.settle(done);
     },
     onInterrupt: stop,
     onReverseComplete: stop,

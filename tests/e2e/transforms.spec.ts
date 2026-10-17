@@ -1,4 +1,4 @@
-import { expect, finishedAt, initResult, sampleReveal, test, twinBox } from "./helpers";
+import { expect, finishedAt, initResult, revealDone, sampleReveal, scrollTo, test, twinBox } from "./helpers";
 
 test.describe("a reveal on an element with a transform of its own", () => {
   test.beforeEach(async ({ page, fixtureUrl }) => {
@@ -56,6 +56,8 @@ test.describe("the site's own GSAP tween on an element with a transform of its o
     ["tailwind", "Tailwind's translate-x-10"],
     ["scale", "scale: 1.2"],
     ["rotate", "rotate: 8deg"],
+    ["slide", "transform: translateX(-50%)"],
+    ["plain", "no transform of its own"],
   ] as const;
 
   for (const [id, css] of cases) {
@@ -90,4 +92,18 @@ test.describe("the site's own GSAP tween on an element with a transform of its o
       expect(Math.abs(box[key] - twin[key]), `${key} moved`).toBeLessThanOrEqual(1);
     }
   });
+});
+
+test("rotate turns an element around its own transform-origin", async ({ page, fixtureUrl }) => {
+  await page.goto(fixtureUrl("transforms"));
+  expect(await initResult(page)).toBe("resolved");
+  const cornered = page.locator("#cornered");
+  const origin = await page.locator("#cornered-twin").evaluate((element) => getComputedStyle(element).transformOrigin);
+
+  await scrollTo(cornered);
+  // Partway through its turn, on the twin's origin.
+  await expect.poll(() => cornered.evaluate((element) => element.style.transform)).toContain("rotate");
+  expect(await cornered.evaluate((element) => getComputedStyle(element).transformOrigin)).toBe(origin);
+  await revealDone(cornered);
+  expect(await cornered.evaluate((element) => getComputedStyle(element).transformOrigin)).toBe(origin);
 });

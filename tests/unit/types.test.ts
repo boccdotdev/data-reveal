@@ -234,7 +234,29 @@ describe.each(oneShot)("%s when it finishes", (name, init) => {
     const vars = run(init, 'class="muted"');
     document.head.innerHTML = "";
     // clip doesn't animate opacity at all.
-    if ("opacity" in vars) expect(vars.opacity).toBe(0.6);
+    if (!("opacity" in vars)) return;
+    expect(vars.opacity).toBe(0.6);
+    // Nor past it, on the way, with an ease that overshoots.
+    const cap = (vars.modifiers as { opacity: (value: string, target: Element) => number }).opacity;
+    expect(cap("0.64", document.body)).toBe(0.6);
+    expect(cap("0.3", document.body)).toBe(0.3);
+  });
+
+  it("puts GSAP's record of a plain element's transform back on destroy(), but not when it finishes", () => {
+    // blur and clip don't read or move the transform.
+    if (name === "blur" || name === "clip") return;
+    registry.killAll();
+    complete("");
+    const finished = recorded.set.length;
+    registry.killAll({ restore: "animated" });
+    expect(recorded.set.length).toBe(finished);
+
+    const waiting = element();
+    registry.snapshot(waiting, waiting);
+    init(waiting, { reduced: false, defaults: {} });
+    const armed = recorded.set.length;
+    registry.killAll({ restore: "animated" });
+    expect(recorded.set.slice(armed)).toEqual([expect.objectContaining({ x: 0, y: 0, rotation: 0, scaleX: 1 })]);
   });
 
   it("keeps its end state with reverse or keep", () => {
@@ -489,6 +511,18 @@ describe("batch", () => {
     }
   });
 
+  it("takes items over from its own earlier tweens, never with GSAP's overwrite, which would kill another reveal's", () => {
+    registry.killAll();
+    const vars = batchVars("data-reveal-reverse");
+    const item = document.querySelector("li") as HTMLElement;
+    (vars.onEnter as (group: Element[]) => void)([item]);
+    const first = recorded.tweens[recorded.tweens.length - 1];
+    (vars.onLeaveBack as (group: Element[]) => void)([item]);
+
+    expect(first.kill).toHaveBeenCalledWith([item]);
+    for (const tween of recorded.to.slice(-2)) expect(tween.overwrite).toBeUndefined();
+  });
+
   it("uses the built-in start unless one is set", () => {
     expect(batchVars().start).toBe(defaultStart);
     expect(batchVars("", { start: "top 75%" }).start).toBe("top 75%");
@@ -583,6 +617,43 @@ describe("when reveals finish (#56, #57)", () => {
       expect(registry.size).toBe(1);
       expect(state(target)).toBeNull();
     }
+  });
+
+  it("leaves an element another reveal is already animating to it, and is done once that one is", () => {
+    registry.killAll();
+    const other = document.createElement("ul");
+    const target = arm(fade);
+    registry.snapshot(other, target);
+    registry.started(other, target);
+    const vars = recorded.to[recorded.to.length - 1] as Callbacks;
+    const tween = { targets: () => [target], kill: vi.fn() };
+    vars.onStart?.call(tween);
+    expect(tween.kill).toHaveBeenCalled();
+    expect(registry.animating(target)).toBe(true);
+
+    registry.stopped(other, target);
+    expect(state(target)).toBeNull();
+    registry.settle(target);
+    expect(state(target)).toBe("done");
+  });
+
+  it("isn't done, nor hands back, while another reveal is still animating the element", () => {
+    registry.killAll();
+    const other = document.createElement("ul");
+    const target = arm(fade);
+    registry.snapshot(other, target);
+    const vars = recorded.to[recorded.to.length - 1] as Callbacks;
+    const tween = { targets: () => [target] };
+    vars.onStart?.call(tween);
+    registry.started(other, target);
+    target.style.opacity = "0.5";
+    vars.onComplete?.call(tween);
+    expect(state(target)).toBeNull();
+    expect(target.style.opacity).toBe("0.5");
+
+    registry.stopped(other, target);
+    registry.settle(target);
+    expect(state(target)).toBe("done");
   });
 
   it("marks a play-once reveal done straight away under reduced motion, but not reverse or parallax", () => {

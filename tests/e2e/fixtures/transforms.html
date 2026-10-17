@@ -21,6 +21,8 @@
     .raised { translate: 0 -30px; }
     /* Like Tailwind v4's translate-x-10, which sets the translate property. */
     .tw-translate-x-10 { --tw-translate-x: 40px; --tw-translate-y: 0; translate: var(--tw-translate-x) var(--tw-translate-y); }
+    /* Turns about its top left corner rather than its centre. */
+    .cornered { transform-origin: 0 0; }
   </style>
 </head>
 <body>
@@ -59,6 +61,16 @@
   <div class="pair">
     <div class="stage"><div id="parallax" class="box raised" data-reveal="parallax">parallax, translate: 0 -30px</div></div>
     <div class="stage"><div id="parallax-twin" class="box raised twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="plain" class="box" data-reveal="fade" data-reveal-duration="0.4">fade, no transform of its own</div></div>
+    <div class="stage"><div id="plain-twin" class="box twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><div id="cornered" class="box cornered" data-reveal="rotate" data-reveal-duration="1.5" data-reveal-ease="none">rotate, transform-origin: 0 0</div></div>
+    <div class="stage"><div id="cornered-twin" class="box cornered twin">twin</div></div>
   </div>
   <div class="gap"></div>
   <div class="pair">

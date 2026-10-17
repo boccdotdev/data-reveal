@@ -80,6 +80,14 @@ export const init: RevealInit = (el, ctx) => {
     // Splitting words alongside chars wraps each char in an inline-block
     // word, so a word wraps as a unit instead of breaking between letters.
     type: splitType === "chars" ? "words, chars" : splitType,
+    // <span> pieces, not SplitText's <div>s, so a split element still holds
+    // only phrasing content, and Firefox copies its text as text rather than
+    // a piece per line. The classes name them for styling and for the print
+    // rules in reveal.css.
+    tag: "span",
+    charsClass: "data-reveal-char",
+    wordsClass: "data-reveal-word",
+    linesClass: "data-reveal-line",
     aria: aria === "auto" ? "auto" : "none",
     // Re-split when fonts finish loading or the element's width changes,
     // including when an element split before it was in the page gets a size.
@@ -90,6 +98,13 @@ export const init: RevealInit = (el, ctx) => {
     // ScrollTrigger) first, and takes the new one to the same point in time.
     onSplit(self) {
       splits++;
+      // What SplitText gives <div> pieces but not <span>s: words and chars
+      // as inline-block, so they can move and a word never breaks apart,
+      // lines as blocks.
+      for (const piece of [...self.words, ...self.chars]) {
+        Object.assign((piece as HTMLElement).style, { position: "relative", display: "inline-block" });
+      }
+      for (const line of self.lines) Object.assign((line as HTMLElement).style, { position: "relative", display: "block" });
       if (aria === "hidden") readCopiesInstead(splitType === "lines" ? self.lines : self.words);
       const targets = self[splitType];
       gsap.set(targets, { opacity: 0, yPercent: 60 });
@@ -118,7 +133,7 @@ export const init: RevealInit = (el, ctx) => {
     },
   };
   const split = SplitText.create(el, vars);
-  registry.addSplit(el, split);
+  registry.addRevert(el, split);
 
   // autoSplit re-splits lines on the font set's `loadingdone` event, which
   // WebKit doesn't fire for a font that starts loading after the split. Its

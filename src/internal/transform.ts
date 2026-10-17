@@ -42,16 +42,10 @@ export function uncache(el: Element): void {
   if (cache && individual.has(el)) cache.uncache = 1;
 }
 
-/**
- * Gets `el` ready for the reveal on `owner` to animate its transform: notes
- * whether its own CSS sets the individual transform properties, which is
- * what uncache() checks, and makes killing the reveal call uncache(el), since
- * destroy() hands the transform back. Call it before GSAP first reads the
- * element. The check can't wait for uncache(): by then GSAP has written
- * `none` for them inline.
- */
-export function watchTransform(el: HTMLElement, owner: Element = el): void {
-  registry.add(owner, { kill: () => uncache(el) });
+// Notes whether `el`'s own CSS sets the individual transform properties,
+// which is what uncache() checks. It has to be read before GSAP first reads
+// the element: GSAP then writes `none` for them inline.
+function watchTransform(el: HTMLElement): void {
   const style = getComputedStyle(el);
   const sets = ["translate", "rotate", "scale"].some((name) => {
     const value = style.getPropertyValue(name);
@@ -73,14 +67,21 @@ export function watchTransform(el: HTMLElement, owner: Element = el): void {
 // afresh only when its styles might not be its own: an earlier reveal left
 // values in GSAP's cache (a re-init), or another reveal on it has set a
 // starting state. Then it's read as its snapshot recorded it, and that
-// state is put back afterwards. `owner` is the reveal the element belongs
-// to (a batch for its items), for watchTransform().
-export function ownTransform(el: HTMLElement, owner: Element = el): OwnTransform {
+// state is put back afterwards.
+//
+// When destroy() puts the element back, GSAP's cache has to match what the
+// CSS then shows, or a site's next tween, or the next reveal to arm it,
+// starts from the reveal's leftover offset. With the individual properties,
+// uncache() makes GSAP read it again. Without them, the cache is set to the
+// values read here, which keeps a site's own `rotation: 270`. Call it after
+// the element is snapshotted (the core snapshots the element a reveal is on;
+// batch snapshots its items).
+export function ownTransform(el: HTMLElement): OwnTransform {
   const { rerun, shared } = registry.styledBefore(el);
   const fresh = rerun || shared;
   const style = el.getAttribute("style");
   if (shared) registry.restoreAnimated(el);
-  watchTransform(el, owner);
+  watchTransform(el);
   const read = (property: string, uncache = false): number =>
     Number(getProperty(el, property, undefined, uncache));
   const own: OwnTransform = {
@@ -99,5 +100,9 @@ export function ownTransform(el: HTMLElement, owner: Element = el): OwnTransform
     else el.setAttribute("style", style);
     read("x", true);
   }
+  registry.resetOnRestore(el, () => {
+    if (individual.has(el)) uncache(el);
+    else gsap.set(el, own);
+  });
   return own;
 }

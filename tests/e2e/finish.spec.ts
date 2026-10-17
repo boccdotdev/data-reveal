@@ -161,3 +161,32 @@ test.describe("destroy()", () => {
     await expect(page.locator("#fade")).toHaveCSS("opacity", "0");
   });
 });
+
+test("destroy() during a reveal, as a page transition would, shows every type with nothing left inline", async ({
+  page,
+  fixtureUrl,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await page.goto(fixtureUrl("partway"));
+  expect(await initResult(page)).toBe("resolved");
+  await expect
+    .poll(() => page.locator("#fade-now").evaluate((element) => Number(getComputedStyle(element).opacity)))
+    .toBeGreaterThan(0);
+
+  await page.evaluate(() => window.__reveal.instance?.destroy());
+  for (const type of ["fade", "scale", "split", "batch", "blur", "clip", "rotate", "slide", "counter"]) {
+    const target = page.locator(`#${type}-now`);
+    expect(await opacities(target), type).not.toContain("0");
+    expect(await leftovers(target), type).toEqual(nothingLeft);
+    // Nothing inline on it or anything inside it, and split's own HTML is back.
+    expect(await target.evaluate((element) => [element, ...element.querySelectorAll("*")].filter((node) => node.hasAttribute("style")).length), type).toBe(0);
+  }
+  await expect(page.locator("#split-now")).toHaveText("Split heading");
+  await expect(page.locator("#split-now *")).toHaveCount(0);
+  await expect(page.locator("#counter-now")).toHaveText("1200");
+  expect(errors).toEqual([]);
+});

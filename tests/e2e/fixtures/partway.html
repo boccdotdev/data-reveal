@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Reveals partway through</title>
+  <style>
+    .box, h2, ul { margin: 2px 0; min-height: 0; }
+    ul { padding: 0; list-style: none; }
+    .raised { translate: 0 -10px; }
+    /* A site's own print styles, which the print rules leave alone. */
+    @media print {
+      .tilted-on-paper { transform: rotate(5deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- In view, each partway through a long reveal. -->
+  <div id="fade-now" class="box" data-reveal="fade" data-reveal-duration="30">fade</div>
+  <div id="scale-now" class="box" data-reveal="scale" data-reveal-duration="30">scale</div>
+  <h2 id="split-now" data-reveal="split" data-reveal-duration="30" data-reveal-stagger="0">Split heading</h2>
+  <ul id="batch-now" data-reveal="batch" data-reveal-duration="30" data-reveal-stagger="0"><li>one</li><li>two</li></ul>
+  <div id="blur-now" class="box" data-reveal="blur" data-reveal-duration="30">blur</div>
+  <div id="clip-now" class="box" data-reveal="clip" data-reveal-duration="30">clip</div>
+  <div id="rotate-now" class="box" data-reveal="rotate" data-reveal-duration="30">rotate</div>
+  <div id="slide-now" class="box" data-reveal="slide" data-reveal-duration="30">slide</div>
+  <div id="counter-now" class="box" data-reveal="counter" data-reveal-duration="30" data-reveal-to="1200">0</div>
+  <div id="parallax-now" class="box" data-reveal="parallax">parallax</div>
+  <!-- In view, finished, with a transform of its own. -->
+  <div id="done" class="box raised" data-reveal="fade" data-reveal-duration="0.2">fade, finished</div>
+  <div id="unrelated" class="box tilted-on-paper">not a reveal, turned on paper</div>
+  <div class="gap"></div>
+  <!-- Below the fold, each still waiting. -->
+  <div id="fade" class="box" data-reveal="fade">fade</div>
+  <div id="scale" class="box" data-reveal="scale">scale</div>
+  <h2 id="split" data-reveal="split" data-reveal-split="lines">Split heading</h2>
+  <ul id="batch" data-reveal="batch"><li data-reveal-item>one</li><li data-reveal-item>two</li></ul>
+  <div id="blur" class="box" data-reveal="blur">blur</div>
+  <div id="clip" class="box" data-reveal="clip">clip</div>
+  <div id="rotate" class="box" data-reveal="rotate">rotate</div>
+  <div id="slide" class="box" data-reveal="slide">slide</div>
+  <div id="counter" class="box" data-reveal="counter">1200</div>
+  <div id="parallax" class="box" data-reveal="parallax">parallax</div>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

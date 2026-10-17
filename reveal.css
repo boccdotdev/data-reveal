@@ -19,6 +19,13 @@
 
   parallax is left out: it has no hidden starting state, so hiding it would
   only make it pop in late.
+
+  On paper nothing scrolls, so a reveal still waiting or partway through
+  would print blank or half shown. The print rules show those at their end:
+  no opacity, transform, clip-path or filter from the reveal on the element,
+  on a batch's items or on split's pieces. A finished reveal has already
+  handed these back to the element's own CSS, so it prints as styled. Layout
+  is left alone.
 */
 @media screen and (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   [data-reveal]:not([data-reveal="parallax"], [data-reveal-state]) {
@@ -31,5 +38,22 @@
 @keyframes data-reveal-failsafe {
   to {
     opacity: 1;
+  }
+}
+
+@media print {
+  [data-reveal-state="ready"],
+  [data-reveal="batch"][data-reveal-state="ready"] > *,
+  [data-reveal="batch"][data-reveal-state="ready"] [data-reveal-item],
+  .data-reveal-line,
+  .data-reveal-word,
+  .data-reveal-char {
+    opacity: 1 !important;
+    transform: none !important;
+    translate: none !important;
+    rotate: none !important;
+    scale: none !important;
+    clip-path: none !important;
+    filter: none !important;
   }
 }

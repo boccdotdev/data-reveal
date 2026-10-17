@@ -3,6 +3,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
 import { revealCallbacks, revealedAtOnce } from "../internal/finish.js";
+import { capOpacity } from "../internal/opacity.js";
 import { options } from "../internal/options.js";
 import { ownTransform } from "../internal/transform.js";
 import { revealTrigger } from "../internal/trigger.js";
@@ -48,6 +49,7 @@ export const init: RevealInit = (el, ctx) => {
 
   const tween = gsap.to(el, {
     opacity,
+    modifiers: capOpacity(opacity),
     ...toRotation,
     duration,
     delay,

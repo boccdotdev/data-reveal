@@ -15,9 +15,25 @@ export function unhide(el: HTMLElement): void {
  * otherwise settle at 0 (a site's own pre-hide). Read it before hiding the
  * element, so a finished reveal can hand opacity back to the element's CSS
  * without a jump.
+ *
+ * Another reveal on the element (a batch item that is also a fade) may have
+ * hidden it already, so then it's read as its snapshot recorded it, and the
+ * current state is put back afterwards. `reveal.css` may also still be
+ * hiding it, as a reveal element its own type hasn't reached yet, so that is
+ * lifted while reading.
  */
 export function shownOpacity(el: HTMLElement): number {
+  const { shared } = registry.styledBefore(el);
+  const style = el.getAttribute("style");
+  if (shared) registry.restoreAnimated(el);
+  const waiting = el.matches("[data-reveal]:not([data-reveal-state])");
+  if (waiting) el.setAttribute("data-reveal-state", "ready");
   const opacity = parseFloat(restingOpacity(el) ?? "");
+  if (waiting) el.removeAttribute("data-reveal-state");
+  if (shared) {
+    if (style === null) el.removeAttribute("style");
+    else el.setAttribute("style", style);
+  }
   return opacity > 0 ? opacity : 1;
 }
 

@@ -87,7 +87,7 @@ describe("registry", () => {
     html(`<h2 id="a"></h2>`);
     const split = { revert: vi.fn() };
 
-    registry.addSplit(el("a"), split);
+    registry.addRevert(el("a"), split);
     registry.killElement(el("a"));
     expect(split.revert).toHaveBeenCalledTimes(1);
   });
@@ -178,9 +178,53 @@ describe("snapshots", () => {
     registry.snapshot(el("item"), el("item"));
     // The item's own reveal is stopped partway; the batch has finished.
     registry.started(el("item"), el("item"));
+    registry.finished(el("list"));
     el("item").style.opacity = "0.1";
 
     registry.killElement(el("item"), { restore: "animated" });
+    expect(el("item").hasAttribute("style")).toBe(false);
+  });
+
+  it("leaves a shared target to a reveal still to play there, such as another instance's", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.snapshot(el("list"), el("item"));
+    registry.snapshot(el("item"), el("item"));
+    // The item's own fade is waiting below the fold, hiding it.
+    el("item").style.opacity = "0";
+    const reset = vi.fn();
+    registry.resetOnRestore(el("item"), reset);
+
+    registry.killElement(el("list"), { restore: "animated" });
+    expect(el("item").style.opacity).toBe("0");
+    expect(reset).not.toHaveBeenCalled();
+    // Once that reveal is killed too, the item goes back.
+    registry.killElement(el("item"), { restore: "animated" });
+    expect(el("item").hasAttribute("style")).toBe(false);
+    expect(reset).toHaveBeenCalledTimes(1);
+  });
+
+  it("finishes a reveal that yielded a target once the reveal it yielded to is done with it", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.snapshot(el("list"), el("item"));
+    registry.snapshot(el("item"), el("item"));
+    registry.started(el("list"), el("item"));
+    expect(registry.animatedByOthers(el("item"), el("item"))).toBe(true);
+    expect(registry.animatedByOthers(el("list"), el("item"))).toBe(false);
+    const done = vi.fn();
+    registry.yieldTo(el("item"), el("item"), done);
+
+    registry.stopped(el("list"), el("item"));
+    registry.settle(el("item"));
+    expect(done).toHaveBeenCalledTimes(1);
+    // Killed instead, the reveal it yielded to still finishes it, and its own
+    // waiting doesn't hold the restore back.
+    registry.started(el("list"), el("item"));
+    registry.yieldTo(el("item"), el("item"), done);
+    el("item").style.opacity = "0.4";
+    registry.killElement(el("list"), { restore: "animated" });
+    expect(done).toHaveBeenCalledTimes(2);
     expect(el("item").hasAttribute("style")).toBe(false);
   });
 

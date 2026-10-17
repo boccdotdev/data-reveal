@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { unhide } from "../../src/core/visibility";
-import { el, html } from "./helpers";
+import { el, html, loadCore } from "./helpers";
 
 beforeEach(() => {
   document.head.innerHTML = `<style>.hidden { opacity: 0; } .muted { opacity: 0.6; }</style>`;
@@ -64,5 +64,30 @@ describe("unhide()", () => {
 
     unhide(el("a"));
     expect(el("a").style.opacity).toBe("1");
+  });
+});
+
+describe("shownOpacity()", () => {
+  it("reads an element another reveal has hidden as its snapshot recorded it, and leaves it hidden", async () => {
+    const { registry } = await loadCore();
+    const { shownOpacity } = await import("../../src/core/visibility");
+    html(`<ul id="list"><li id="item" class="muted"></li></ul>`);
+    // The batch armed first and hid its item; now the item's own fade arms.
+    registry.snapshot(el("list"), el("item"));
+    el("item").style.opacity = "0";
+    registry.snapshot(el("item"), el("item"));
+
+    expect(shownOpacity(el("item"))).toBe(0.6);
+    expect(el("item").style.opacity).toBe("0");
+  });
+
+  it("reads a reveal element reveal.css is still hiding as its own CSS has it", async () => {
+    await loadCore();
+    const { shownOpacity } = await import("../../src/core/visibility");
+    document.head.innerHTML += `<style>[data-reveal]:not([data-reveal-state]) { opacity: 0; }</style>`;
+    html(`<ul><li id="item" class="muted" data-reveal="fade"></li></ul>`);
+
+    expect(shownOpacity(el("item"))).toBe(0.6);
+    expect(el("item").hasAttribute("data-reveal-state")).toBe(false);
   });
 });
