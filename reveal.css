@@ -1,0 +1,35 @@
+/*
+  Pre-hide for @boccdotdev/data-reveal.
+
+  Hides [data-reveal] elements from first paint until the package has handled
+  them, so they don't flash in, vanish and then animate. It can only ever hide
+  content for a while:
+
+  - Only on screen, while scripting is on and motion isn't reduced. Without
+    JS, under reduced motion, in print, or in a browser that doesn't know the
+    `scripting` media feature, content shows as written.
+  - Only until init() sets data-reveal-state on the element, which it does
+    whatever happens: the type took over ("ready"), no type is registered
+    under that name ("skipped"), or the type failed to load or threw
+    ("failed").
+  - If the package never runs at all, a zero-length animation shows the
+    element after --data-reveal-failsafe (default 5s). The delay sits in its
+    own declaration so a malformed value falls back to 0s and shows the
+    element straight away, instead of breaking the whole animation.
+
+  parallax is left out: it has no hidden starting state, so hiding it would
+  only make it pop in late.
+*/
+@media screen and (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-reveal]:not([data-reveal="parallax"], [data-reveal-state]) {
+    opacity: 0;
+    animation: data-reveal-failsafe 0s 5s forwards;
+    animation-delay: var(--data-reveal-failsafe, 5s);
+  }
+}
+
+@keyframes data-reveal-failsafe {
+  to {
+    opacity: 1;
+  }
+}

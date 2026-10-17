@@ -37,6 +37,56 @@ That's it. Add a `data-reveal` attribute to any element and it animates as it sc
 
 Because loading is dynamic, `init()` is **async**. `await` it (or `.then()`) if you need to run code after reveals are set up.
 
+Each type starts as soon as its own module arrives, so a slow `split` chunk doesn't hold back `fade`. The promise settles once every type has. If one type's chunk never finishes loading, the other types still run but `init()` doesn't settle.
+
+## Hiding elements until they load
+
+A reveal hides its element when `init()` reaches it, which is after your script and the type's chunk have loaded. Until then the content is visible, so it can flash in and out before animating. Import the shipped stylesheet in your main CSS to hide reveal elements from the first paint:
+
+```css
+@import "@boccdotdev/data-reveal/reveal.css";
+```
+
+The file sits at the package root, so `postcss-import` (as in Tailwind v3 setups) finds it as well as bundlers that read `exports`.
+
+It only hides content while that's safe:
+
+- Only on screen, while JavaScript is on and the visitor hasn't asked for reduced motion. Printing never hides anything. Browsers without the `scripting` media feature (Safari before 17, Chrome before 120, Firefox before 113) skip the rule, so their visitors can see the flash but never a blank page.
+- Only until `init()` handles the element. `init()` sets `data-reveal-state` on every element it reaches: `ready` when its type took over, `skipped` when no type is registered under that name, and `failed` when the type's module didn't load or its init threw. The stylesheet lets go in all three cases.
+- If your script never runs, a CSS failsafe shows the content after 5 seconds. Change the delay with a custom property. The value needs a time unit, like `3s` or `3000ms`. Anything else, `0` included, shows the content straight away.
+
+```css
+:root { --data-reveal-failsafe: 3s; }
+```
+
+`parallax` is never hidden, because it has no hidden starting state.
+
+Import the stylesheet from CSS that loads in `<head>`. Imported from JavaScript, it can arrive too late to stop the flash.
+
+The failsafe is a CSS animation on each waiting element, so it competes with any `animation` rule of your own that matches the same element. If yours wins the cascade, the failsafe never runs and the element stays hidden on a page whose script fails. If the failsafe wins, your animation waits until `init()` reaches the element.
+
+`destroy()` leaves `data-reveal-state` in place on purpose, so the stylesheet doesn't hide content you've torn down.
+
+### Writing your own rule
+
+Copy `reveal.css` rather than writing a shorter rule. Keep all three parts: the media query, the `:not([data-reveal-state])` and the failsafe. A bare `[data-reveal] { opacity: 0 }` leaves the page blank whenever the script doesn't run.
+
+```css
+@media screen and (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-reveal]:not([data-reveal="parallax"], [data-reveal-state]) {
+    opacity: 0;
+    animation: data-reveal-failsafe 0s 5s forwards;
+    animation-delay: var(--data-reveal-failsafe, 5s);
+  }
+}
+
+@keyframes data-reveal-failsafe {
+  to { opacity: 1; }
+}
+```
+
+If you keep an older rule that hides every `[data-reveal]`, each type still shows its element once it runs. `counter`, `parallax`, `clip` and the `split` and `batch` containers don't animate their own opacity, so they set it to 1 only if it computes to 0 when they start, and otherwise keep the opacity your CSS gives them. Skipped and failed elements stay hidden under a rule like that.
+
 ## Minimal builds (manual registration)
 
 Auto mode is convenient, but to dynamically load any type on demand it has to *reference* every type — so your bundler emits a chunk file for all of them, even ones your site never uses. They're never downloaded unless present on a page, but the files still sit in your build output.
@@ -52,7 +102,7 @@ const reveal = createReveal({ types: [fade, scale] });
 await reveal.init();
 ```
 
-Each type is importable from its own subpath: `@boccdotdev/data-reveal/{fade,scale,split,batch,blur,clip,rotate,slide,counter,parallax}`. The HTML API is identical — `data-reveal="fade"` still works; you've just told the bundler which types are in play. A `data-reveal` type you didn't register is silently skipped.
+Each type is importable from its own subpath: `@boccdotdev/data-reveal/{fade,scale,split,batch,blur,clip,rotate,slide,counter,parallax}`. The HTML API is identical — `data-reveal="fade"` still works; you've just told the bundler which types are in play. A `data-reveal` type you didn't register is skipped without an error and gets `data-reveal-state="skipped"`, unless another instance has already set a state on it.
 
 The returned instance is the same as auto mode — `init`, `refresh`, `destroy` all behave identically. Choose auto for zero-config convenience, manual when build size matters.
 
@@ -62,7 +112,7 @@ The returned instance is the same as auto mode — `init`, `refresh`, `destroy` 
 const reveal = createReveal();
 
 await reveal.init();              // scan document
-await reveal.init(myContainer);   // scan a subtree only (any ParentNode)
+await reveal.init(myContainer);   // scan a subtree only (any ParentNode), including myContainer itself
 
 reveal.refresh();                 // recompute all ScrollTrigger positions
 
@@ -72,6 +122,12 @@ reveal.destroy(myContainer);      // kill + forget only reveals on/inside myCont
 
 `init()` is idempotent — already-initialized elements are skipped, so you can safely call it again as new content is added (e.g. infinite scroll).
 
+If a type's module fails to load, or its init throws on an element, `init()` still runs every other type, marks the affected elements `data-reveal-state="failed"`, and rejects with the first error once every type has settled. A failed element shows without its animation if your pre-hide CSS is keyed on the state, as `reveal.css` is. Anything the type set up on it before throwing is undone.
+
+Failed elements are also released, so a later `init()` tries them again. Whether that works depends on the loader. A browser keeps a failed native `import()` for the life of the page, so in auto mode without a bundler the retry fails the same way until a reload. Loaders that fetch again, such as webpack's, can recover, and a type whose init threw simply runs again.
+
+If an earlier `init()` call is still loading some of the elements a new call covers, the new call waits for them, so by the time it resolves every element it covers has been handled.
+
 ### `refresh()`
 
 Recomputes every ScrollTrigger's start/end positions. ScrollTrigger already refreshes on window resize and load, but a **JavaScript-driven layout change doesn't fire that** — so call `refresh()` after toggling a grid's column count, opening an accordion, or when fonts/images finish loading and shift the page. Calls are coalesced to one refresh per frame, so it's cheap to call repeatedly.
@@ -79,6 +135,8 @@ Recomputes every ScrollTrigger's start/end positions. ScrollTrigger already refr
 ### `destroy(container?)`
 
 With no argument, kills all tweens + ScrollTriggers, reverts SplitText, and forgets every element — a later `init()` re-runs the whole page. Pass a `container` to tear down only the reveals on or inside it; those elements are forgotten too, so re-adding content there and calling `init()` re-animates just that subtree. `contains` works on detached nodes, so you can pass a subtree you're about to remove. Use the scoped form for SPA partial swaps, the bare form for a full route change.
+
+`destroy()` also covers an `init()` that is still loading types. That call skips the elements you destroyed, so `init(); destroy(); init()` arms each element once. An element removed from the page while its type loads isn't armed either, and a later `init()` picks it up if it comes back.
 
 ## Animation types
 

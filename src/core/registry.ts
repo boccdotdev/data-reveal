@@ -62,6 +62,15 @@ class RevealRegistry {
     this.entries = remaining;
   }
 
+  // Kill only what is registered to this exact element. Unlike kill(el), it
+  // leaves reveals nested inside the element running.
+  killElement(el: Element): void {
+    const entry = this.entries.find((e) => e.el === el);
+    if (!entry) return;
+    this.killEntry(entry);
+    this.entries = this.entries.filter((e) => e !== entry);
+  }
+
   private killEntry(entry: Entry): void {
     entry.killables.forEach((k) => k.kill());
     entry.revertables.forEach((r) => r.revert());

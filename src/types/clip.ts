@@ -2,6 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { num } from "../internal/attrs.js";
+import { unhide } from "../internal/opacity.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
@@ -18,7 +19,8 @@ const fromClip: Record<Direction, string> = {
 
 export const init: RevealInit = (el, { reduced }) => {
   if (reduced) {
-    gsap.set(el, { clipPath: "inset(0 0 0 0)", opacity: 1 });
+    gsap.set(el, { clipPath: "inset(0 0 0 0)" });
+    unhide(el);
     return;
   }
 
@@ -26,7 +28,8 @@ export const init: RevealInit = (el, { reduced }) => {
   const duration = num(el.dataset.revealDuration, 0.7);
   const delay = num(el.dataset.revealDelay, 0);
 
-  gsap.set(el, { clipPath: fromClip[direction] ?? fromClip.up, opacity: 1 });
+  gsap.set(el, { clipPath: fromClip[direction] ?? fromClip.up });
+  unhide(el);
 
   const tween = gsap.to(el, {
     clipPath: "inset(0 0 0 0)",

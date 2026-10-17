@@ -2,6 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { num } from "../internal/attrs.js";
+import { unhide } from "../internal/opacity.js";
 import { isReverse, revealStart } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
@@ -13,7 +14,8 @@ export const init: RevealInit = (el, { reduced }) => {
     items.length > 0 ? Array.from(items) : (Array.from(el.children) as HTMLElement[]);
 
   if (reduced) {
-    gsap.set([el, ...targets], { opacity: 1 });
+    unhide(el);
+    gsap.set(targets, { opacity: 1 });
     return;
   }
 
@@ -23,7 +25,7 @@ export const init: RevealInit = (el, { reduced }) => {
   const start = revealStart(el);
   const reverse = isReverse(el);
 
-  gsap.set(el, { opacity: 1 });
+  unhide(el);
   gsap.set(targets, { opacity: 0, y: distance });
 
   const triggers = ScrollTrigger.batch(targets, {

@@ -12,6 +12,7 @@
       "types": "./dist/manual.d.ts",
       "import": "./dist/manual.js"
     },
+    "./reveal.css": "./reveal.css",
     "./batch": {
       "types": "./dist/types/batch.d.ts",
       "import": "./dist/types/batch.js"
@@ -54,9 +55,12 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "reveal.css"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

@@ -30,8 +30,8 @@ const loaders: Record<RevealType, () => Promise<{ init: RevealInit }>> = {
  */
 export function createReveal(): RevealInstance {
   return createRevealCore(async (type) => {
-    const loader = loaders[type as RevealType];
-    if (!loader) return null;
-    return (await loader()).init;
+    // Own keys only, so `data-reveal="valueOf"` isn't found on the prototype.
+    if (!Object.prototype.hasOwnProperty.call(loaders, type)) return null;
+    return (await loaders[type as RevealType]()).init;
   });
 }

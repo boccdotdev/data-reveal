@@ -3,6 +3,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { registry } from "../core/registry.js";
 import { num } from "../internal/attrs.js";
+import { unhide } from "../internal/opacity.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, SplitType, RevealRegistration } from "../internal/types.js";
 
@@ -10,7 +11,7 @@ gsap.registerPlugin(ScrollTrigger, SplitText);
 
 export const init: RevealInit = (el, { reduced }) => {
   if (reduced) {
-    gsap.set(el, { opacity: 1 });
+    unhide(el);
     return;
   }
 
@@ -26,7 +27,7 @@ export const init: RevealInit = (el, { reduced }) => {
   registry.addSplit(el, split);
 
   const targets = split[splitType];
-  gsap.set(el, { opacity: 1 });
+  unhide(el);
   gsap.set(targets, { opacity: 0, yPercent: 60 });
 
   const tween = gsap.to(targets, {

@@ -2,6 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { num } from "../internal/attrs.js";
+import { unhide } from "../internal/opacity.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
@@ -24,6 +25,9 @@ export const init: RevealInit = (el, { reduced }) => {
     const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
     return `${prefix}${decPart ? `${grouped}.${decPart}` : grouped}${suffix}`;
   };
+
+  // The count is the animation, so the element itself shows straight away.
+  unhide(el);
 
   if (reduced) {
     el.textContent = format(to);

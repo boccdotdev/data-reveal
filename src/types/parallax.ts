@@ -2,6 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { num, str } from "../internal/attrs.js";
+import { unhide } from "../internal/opacity.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -10,6 +11,7 @@ gsap.registerPlugin(ScrollTrigger);
 // scrubbed across the scroll range, so it is already bidirectional and
 // ignores `data-reveal-reverse`.
 export const init: RevealInit = (el, { reduced }) => {
+  unhide(el);
   if (reduced) return;
 
   const speed = num(el.dataset.revealSpeed, 0.3);
