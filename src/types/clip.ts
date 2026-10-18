@@ -42,7 +42,9 @@ export const init: RevealInit = (el, ctx) => {
     delay,
     ease,
     scrollTrigger: revealTrigger(el, ctx),
-    ...revealCallbacks(el, ctx),
+    // It leaves opacity alone, so another reveal hiding the element can't
+    // wait for it to show it.
+    ...revealCallbacks(el, ctx, { handsBack: false }),
   });
 
   registry.track(el, tween);

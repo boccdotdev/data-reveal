@@ -1,6 +1,6 @@
 {
   "name": "@boccdotdev/data-reveal",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Declarative, scroll-triggered reveal animations driven by data attributes. GSAP-powered, code-split so each animation type loads only when present on the page.",
   "type": "module",
   "exports": {
@@ -56,7 +56,9 @@
   },
   "files": [
     "dist",
-    "reveal.css"
+    "reveal.css",
+    "CHANGELOG.md",
+    "UPGRADING.md"
   ],
   "sideEffects": [
     "*.css"

@@ -45,6 +45,12 @@
     <li class="spacer"></li>
   </ul>
   <div class="gap"></div>
+  <!-- The batch reaches the shared item first and slowly; its own fade starts later and leaves it to the batch. -->
+  <ul id="mixed" class="list" data-reveal="batch" data-reveal-duration="3" data-reveal-stagger="0">
+    <li data-reveal-item>m</li>
+    <li id="shared-item" data-reveal-item data-reveal="fade" data-reveal-duration="0.2" data-reveal-start="top 60%">shared</li>
+  </ul>
+  <div class="gap"></div>
   <!-- A filter detaches c before it reveals, and puts it back later. -->
   <ul id="filtered" class="list" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
     <li data-reveal-item>a</li>

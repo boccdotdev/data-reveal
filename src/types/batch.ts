@@ -99,7 +99,9 @@ export const init: RevealInit = (el, ctx) => {
       observer?.unobserve(item);
       unfinished.delete(item);
       running.forEach((tween) => tween.kill([item]));
-      if (!registry.styledBefore(item).shared) {
+      // Unless another reveal on it (a fade that started first) is still
+      // animating it, and hands it back itself.
+      if (!registry.animating(item)) {
         registry.restoreAnimated(item);
         uncache(item);
       }

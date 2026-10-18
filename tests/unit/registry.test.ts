@@ -205,6 +205,36 @@ describe("snapshots", () => {
     expect(reset).toHaveBeenCalledTimes(1);
   });
 
+  it("still waits on a released reveal for a target it takes on later, such as a batch's new item", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="old"></li><li id="item"></li></ul>`);
+    registry.handsBack(el("list"));
+    registry.snapshot(el("list"), el("old"));
+    registry.release(el("list"));
+    // A rescan adds an item that another reveal styles too.
+    registry.snapshot(el("list"), el("item"));
+    registry.snapshot(el("item"), el("item"));
+    el("item").style.opacity = "0";
+
+    registry.killElement(el("item"), { restore: "animated" });
+    expect(el("item").style.opacity).toBe("0");
+  });
+
+  it("forgets that a killed reveal hands its targets back, so a later one on the element that doesn't can't hold a restore", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.handsBack(el("item"));
+    registry.snapshot(el("item"), el("item"));
+    registry.killElement(el("item"));
+    // Armed again, now as a reveal that won't hand it back, and a batch item.
+    registry.snapshot(el("item"), el("item"));
+    registry.snapshot(el("list"), el("item"));
+    el("item").style.opacity = "0";
+
+    registry.killElement(el("list"), { restore: "animated" });
+    expect(el("item").hasAttribute("style")).toBe(false);
+  });
+
   it("puts a shared target back over a reveal that won't hand it back, such as a split or a keep reveal", async () => {
     const { registry } = await loadCore();
     html(`<ul id="list"><li id="item"></li></ul>`);

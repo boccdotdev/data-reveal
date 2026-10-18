@@ -89,6 +89,7 @@ export function revealCallbacks(
     onFinish = finish,
     onDone = () => revealed(el, { release: cleanUp }),
     hides = false,
+    handsBack = true,
   }: {
     target?: HTMLElement;
     cleanUp?: boolean;
@@ -96,10 +97,13 @@ export function revealCallbacks(
     onDone?: (target: HTMLElement) => void;
     // The tween plays the target out rather than in (batch's onLeaveBack).
     hides?: boolean;
+    // The tween animates the target's opacity and transform, so a shared
+    // target can wait for it to hand them back. Not clip, which only clips.
+    handsBack?: boolean;
   } = {},
 ): { onStart: Callback; onComplete: Callback; onInterrupt: Callback; onReverseComplete: Callback } {
   const once = !isReverse(el, ctx);
-  if (once && cleanUp && !target) registry.handsBack(el);
+  if (once && cleanUp && handsBack && !target) registry.handsBack(el);
   const targetOf = (tween: gsap.core.Tween): HTMLElement => target ?? (tween.targets()[0] as HTMLElement);
   const stop: Callback = function () {
     registry.stopped(el, targetOf(this));

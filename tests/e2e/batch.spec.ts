@@ -11,7 +11,8 @@ test("destroy() mid-reveal, then init() again, leaves every batch item where its
   await expect.poll(() => opacityOf(0)).toBeGreaterThan(0);
   await page.evaluate(() => window.scrollBy(0, 200));
   await expect.poll(() => opacityOf(2)).toBeGreaterThan(0);
-  expect(await opacityOf(0)).toBeLessThan(1);
+  // Still revealing: its opacity reaches 1 well before the end, but it isn't done.
+  await expect(items.nth(0)).toHaveAttribute("data-reveal-pending");
 
   // As a filter or sort UI would.
   await page.evaluate(async () => {
@@ -175,6 +176,29 @@ test.describe("a batch and what's in it", () => {
     await revealDone(kept);
     expect(Math.min(...(await growAndSample(page, "grows")))).toBe(1);
     await expect(kept).toHaveAttribute("data-reveal-state", "done");
+  });
+
+  test("an item taken out mid-reveal, while another reveal on it waits, is handed back and shows as written", async ({
+    page,
+  }) => {
+    const item = page.locator("#shared-item");
+    // The batch starts on it, then its own fade starts and leaves it to the batch.
+    await item.evaluate((element) => window.scrollBy(0, element.getBoundingClientRect().top - window.innerHeight * 0.75));
+    await expect.poll(() => item.evaluate((element) => Number(getComputedStyle(element).opacity))).toBeGreaterThan(0);
+    await item.evaluate((element) => window.scrollBy(0, element.getBoundingClientRect().top - window.innerHeight * 0.5));
+    for (let i = 0; i < 4; i++) await frames(page);
+
+    const left = await page.evaluate(async () => {
+      const element = document.getElementById("shared-item") as HTMLElement;
+      element.remove();
+      await window.__reveal.instance?.init();
+      const inline = [element.style.opacity, element.style.transform];
+      document.getElementById("mixed")?.append(element);
+      return inline;
+    });
+    expect(left).toEqual(["", ""]);
+    await expect(item).toHaveCSS("opacity", "1");
+    expect(await leftovers(item)).toEqual(nothingLeft);
   });
 
   test("an item a filter takes out before it reveals, then puts back, shows as written", async ({ page }) => {

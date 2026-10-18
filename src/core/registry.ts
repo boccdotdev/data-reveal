@@ -35,8 +35,10 @@ interface Snapshot {
   // GSAP transforms SVG elements through attributes, so those are recorded
   // too: the value of each, or null when unset.
   attributes: Array<[name: string, value: string | null]>;
-  // The text destroy() leaves, for types that rewrite it, like counter.
+  // The text destroy() leaves, for types that rewrite it, like counter, and
+  // the reveal that rewrites it.
   text?: string;
+  textOwner?: Element;
   // Run just before destroy() puts the target back (see resetOnRestore()).
   reset?: () => void;
 }
@@ -49,9 +51,6 @@ interface Entry {
   printers: Set<Printer>;
   // The play-once reveal has finished, so it won't change its targets again.
   finished: boolean;
-  // It animates its targets themselves and hands them back when it finishes
-  // (handsBack()), so putting one back can wait for it.
-  handsBack: boolean;
   // It also handed everything back, so it can be dropped once every reveal
   // it shares a snapshot with can too.
   releasable: boolean;
@@ -104,6 +103,10 @@ class RevealRegistry {
   // batch's new items). Kept after release, so a finished batch can take on
   // more items; dropped when the reveal is killed.
   private rescans = new WeakMap<Element, () => boolean>();
+  // The reveals that animate their targets themselves and hand them back when
+  // they finish (handsBack()), so putting a shared target back can wait for
+  // them. Kept after release too, for the targets a rescan adds.
+  private handingBack = new WeakSet<Element>();
 
   private entryFor(el: Element): Entry {
     let entry = this.entries.get(el);
@@ -115,7 +118,6 @@ class RevealRegistry {
         snapshots: [],
         printers: new Set(),
         finished: false,
-        handsBack: false,
         releasable: false,
       };
       this.entries.set(el, entry);
@@ -222,7 +224,10 @@ class RevealRegistry {
       snapshot.owners.add(el);
       entry.snapshots.push(snapshot);
     }
-    if (text !== undefined) snapshot.text = text;
+    if (text !== undefined) {
+      snapshot.text = text;
+      snapshot.textOwner = el;
+    }
   }
 
   /**
@@ -253,7 +258,7 @@ class RevealRegistry {
    * animates its pieces, nor one with `reverse` or `keep`.
    */
   handsBack(el: Element): void {
-    this.entryFor(el).handsBack = true;
+    this.handingBack.add(el);
   }
 
   /** Whether a reveal has hidden `target` itself: an inline `opacity: 0` its snapshot didn't record. */
@@ -415,15 +420,23 @@ class RevealRegistry {
     const yielded = this.yielded.get(snapshot.target) ?? [];
     for (const owner of snapshot.owners) {
       const entry = this.entries.get(owner);
-      if (entry?.handsBack && !entry.finished && !yielded.some((y) => y.el === owner)) return true;
+      if (entry && this.handingBack.has(owner) && !entry.finished && !yielded.some((y) => y.el === owner)) return true;
     }
     return false;
+  }
+
+  // Whether the reveal on `el` is still live: its entry is there (killed ones
+  // are gone) and it hasn't finished.
+  private live(el: Element | undefined): boolean {
+    const entry = el && this.entries.get(el);
+    return !!entry && !entry.finished;
   }
 
   // Stop the animations first so nothing writes to the element afterwards,
   // then undo the split, then put back what the snapshots recorded.
   private killEntry(entry: Entry, restore: Restore): void {
     this.rescans.delete(entry.el);
+    this.handingBack.delete(entry.el);
     entry.killables.forEach((k) => k.kill());
     entry.revertables.forEach((r) => r.revert());
     for (const snapshot of entry.snapshots) {
@@ -436,7 +449,8 @@ class RevealRegistry {
       // reveal on it is animating it or still to play there (another
       // instance's, say) and will hand it back itself.
       if (restore !== "none" && !this.animating(target) && !this.pending(snapshot)) {
-        if (snapshot.text !== undefined) target.textContent = snapshot.text;
+        // The text is the counter's: while it's still to count, it's left alone.
+        if (snapshot.text !== undefined && !this.live(snapshot.textOwner)) target.textContent = snapshot.text;
         snapshot.reset?.();
         this.putBack(snapshot, restore);
         // Back at rest, so print shows it as it is.

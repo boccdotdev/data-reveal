@@ -40,6 +40,8 @@ test("failed and skipped elements show under a site's own pre-hide", async ({ pa
   await expectState(page.locator("#skipped"), "skipped");
   await expect(page.locator("#skipped")).toHaveCSS("opacity", "1");
   await expect(page.locator("#skipped-transition")).toHaveCSS("opacity", "1");
+  // An inline pre-hide is the site's, not a reveal's, so it's lifted too.
+  await expect(page.locator("#inline-hidden")).toHaveCSS("opacity", "1");
 });
 
 for (const reducedMotion of ["no-preference", "reduce"] as const) {

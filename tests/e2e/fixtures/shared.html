@@ -15,7 +15,7 @@
   </style>
 </head>
 <body>
-  <p>Each split is also an item of a batch, which another instance handles.</p>
+  <p>Each reveal is also an item of a batch, which another instance handles.</p>
   <div class="gap"></div>
   <div class="pair">
     <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><p id="once" data-reveal="split" data-reveal-item data-reveal-duration="0.2" data-reveal-stagger="0">Play once</p></li></ul></div>
@@ -28,6 +28,15 @@
   <div class="pair">
     <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><p id="reversed" data-reveal="split" data-reveal-item data-reveal-reverse data-reveal-duration="0.2" data-reveal-stagger="0">Reverse</p></li></ul></div>
     <div class="stage"><p id="reversed-twin" class="twin">Reverse</p></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><div id="clipped" class="box" data-reveal="clip" data-reveal-item data-reveal-duration="0.2">clip</div></li></ul></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><div id="counted" class="box" data-reveal="counter" data-reveal-item data-reveal-duration="0.2" data-reveal-to="1200">0</div></li></ul></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><div id="faded" class="box" data-reveal="fade" data-reveal-item data-reveal-duration="0.2">fade</div></li></ul></div>
   </div>
   <div class="gap"></div>
   <script type="module" src="./harness.js"></script>
