@@ -191,6 +191,7 @@ describe("snapshots", () => {
     registry.snapshot(el("list"), el("item"));
     registry.snapshot(el("item"), el("item"));
     // The item's own fade is waiting below the fold, hiding it.
+    registry.handsBack(el("item"));
     el("item").style.opacity = "0";
     const reset = vi.fn();
     registry.resetOnRestore(el("item"), reset);
@@ -202,6 +203,17 @@ describe("snapshots", () => {
     registry.killElement(el("item"), { restore: "animated" });
     expect(el("item").hasAttribute("style")).toBe(false);
     expect(reset).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts a shared target back over a reveal that won't hand it back, such as a split or a keep reveal", async () => {
+    const { registry } = await loadCore();
+    html(`<ul id="list"><li id="item"></li></ul>`);
+    registry.snapshot(el("item"), el("item"));
+    registry.snapshot(el("list"), el("item"));
+    el("item").style.opacity = "0";
+
+    registry.killElement(el("list"), { restore: "animated" });
+    expect(el("item").hasAttribute("style")).toBe(false);
   });
 
   it("finishes a reveal that yielded a target once the reveal it yielded to is done with it", async () => {

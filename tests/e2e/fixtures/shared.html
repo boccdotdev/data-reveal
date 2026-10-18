@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>A split that is also a batch item</title>
+  <style>
+    .pair { display: flex; gap: 40px; }
+    .stage { position: relative; width: 300px; height: 60px; }
+    .stage ul { margin: 0; padding: 0; list-style: none; }
+    .stage p { margin: 0; }
+    .twin { visibility: hidden; }
+  </style>
+</head>
+<body>
+  <p>Each split is also an item of a batch, which another instance handles.</p>
+  <div class="gap"></div>
+  <div class="pair">
+    <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><p id="once" data-reveal="split" data-reveal-item data-reveal-duration="0.2" data-reveal-stagger="0">Play once</p></li></ul></div>
+    <div class="stage"><p id="once-twin" class="twin">Play once</p></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><p id="kept" data-reveal="split" data-reveal-item data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">Keep</p></li></ul></div>
+    <div class="stage"><p id="kept-twin" class="twin">Keep</p></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul data-reveal="batch" data-reveal-duration="0.2"><li><p id="reversed" data-reveal="split" data-reveal-item data-reveal-reverse data-reveal-duration="0.2" data-reveal-stagger="0">Reverse</p></li></ul></div>
+    <div class="stage"><p id="reversed-twin" class="twin">Reverse</p></div>
+  </div>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+import { pendingAttribute } from "./state.js";
+
 interface Killable {
   kill: () => void;
 }
@@ -8,6 +10,12 @@ interface Revertable {
 
 interface Trackable extends Killable {
   scrollTrigger?: Killable;
+}
+
+/** What a reveal does around printing: `before` shows it at its end, `after` undoes what has to be. */
+export interface Printer {
+  before: () => void;
+  after: () => void;
 }
 
 // What an element looked like before init() touched it, so destroy() can put
@@ -38,8 +46,12 @@ interface Entry {
   killables: Killable[];
   revertables: Revertable[];
   snapshots: Snapshot[];
+  printers: Set<Printer>;
   // The play-once reveal has finished, so it won't change its targets again.
   finished: boolean;
+  // It animates its targets themselves and hands them back when it finishes
+  // (handsBack()), so putting one back can wait for it.
+  handsBack: boolean;
   // It also handed everything back, so it can be dropped once every reveal
   // it shares a snapshot with can too.
   releasable: boolean;
@@ -88,11 +100,24 @@ class RevealRegistry {
   private running = new WeakMap<HTMLElement, Set<Element>>();
   // The reveals that left each target to the one animating it (yieldTo()).
   private yielded = new WeakMap<HTMLElement, Yielded[]>();
+  // How a reveal picks up content added to its element since it armed (a
+  // batch's new items). Kept after release, so a finished batch can take on
+  // more items; dropped when the reveal is killed.
+  private rescans = new WeakMap<Element, () => boolean>();
 
   private entryFor(el: Element): Entry {
     let entry = this.entries.get(el);
     if (!entry) {
-      entry = { el, killables: [], revertables: [], snapshots: [], finished: false, releasable: false };
+      entry = {
+        el,
+        killables: [],
+        revertables: [],
+        snapshots: [],
+        printers: new Set(),
+        finished: false,
+        handsBack: false,
+        releasable: false,
+      };
       this.entries.set(el, entry);
     }
     return entry;
@@ -105,6 +130,43 @@ class RevealRegistry {
 
   add(el: Element, trigger: Killable): void {
     this.entryFor(el).killables.push(trigger);
+  }
+
+  /** How the reveal on `el` shows itself at its end for printing. */
+  onPrint(el: Element, printer: Printer): void {
+    this.entryFor(el).printers.add(printer);
+  }
+
+  /** Runs `before` or `after` for every reveal `owned` accepts, before or after printing. */
+  print(owned: Owned, phase: keyof Printer): void {
+    for (const entry of Array.from(this.entries.values())) {
+      if (owned(entry.el)) entry.printers.forEach((printer) => printer[phase]());
+    }
+  }
+
+  /** How the reveal on `el` takes on content added since it armed. See rescan(). */
+  onRescan(el: Element, rescan: () => boolean): void {
+    this.rescans.set(el, rescan);
+  }
+
+  /**
+   * Gives the reveal on `el`, armed earlier, the chance to take on content
+   * added since. Returns whether it armed anything.
+   */
+  rescan(el: Element): boolean {
+    const armed = this.rescans.get(el)?.() ?? false;
+    if (armed) this.reopen(el);
+    return armed;
+  }
+
+  /**
+   * The reveal on `el` has something to play again (a batch's new items), so
+   * it's no longer finished: a release it was waiting on mustn't take the new
+   * work with it.
+   */
+  reopen(el: Element): void {
+    const entry = this.entries.get(el);
+    if (entry) entry.finished = entry.releasable = false;
   }
 
   /** Something to revert when the reveal on `el` is killed, such as its split. Never on release(). */
@@ -183,6 +245,22 @@ class RevealRegistry {
   /** The reveal on `el` stopped animating `target`: finished or interrupted. */
   stopped(el: Element, target: HTMLElement): void {
     this.running.get(target)?.delete(el);
+  }
+
+  /**
+   * The reveal on `el` animates its targets themselves and hands them back
+   * when it finishes: a play-once reveal that cleans up. Not a split, which
+   * animates its pieces, nor one with `reverse` or `keep`.
+   */
+  handsBack(el: Element): void {
+    this.entryFor(el).handsBack = true;
+  }
+
+  /** Whether a reveal has hidden `target` itself: an inline `opacity: 0` its snapshot didn't record. */
+  hiddenByReveal(target: HTMLElement): boolean {
+    const snapshot = this.snapshotOf.get(target);
+    if (!snapshot || snapshot.owners.size === 0 || target.style.opacity !== "0") return false;
+    return snapshot.props.find(([prop]) => prop === "opacity")?.[1] !== "0";
   }
 
   /** Whether any reveal is animating `target` right now. */
@@ -330,14 +408,14 @@ class RevealRegistry {
   }
 
   // Whether another reveal on the snapshot's target is still to play or
-  // playing there: one not finished that hasn't yielded it. It hands the
-  // target back itself. A reveal already killed, finished or yielded doesn't
-  // count.
+  // playing there and will hand the target back itself: one that handsBack(),
+  // isn't finished and hasn't yielded it. One that won't (a split, or a
+  // reverse or keep reveal) would leave the target as this reveal hid it.
   private pending(snapshot: Snapshot): boolean {
     const yielded = this.yielded.get(snapshot.target) ?? [];
     for (const owner of snapshot.owners) {
       const entry = this.entries.get(owner);
-      if (entry && !entry.finished && !yielded.some((y) => y.el === owner)) return true;
+      if (entry?.handsBack && !entry.finished && !yielded.some((y) => y.el === owner)) return true;
     }
     return false;
   }
@@ -345,6 +423,7 @@ class RevealRegistry {
   // Stop the animations first so nothing writes to the element afterwards,
   // then undo the split, then put back what the snapshots recorded.
   private killEntry(entry: Entry, restore: Restore): void {
+    this.rescans.delete(entry.el);
     entry.killables.forEach((k) => k.kill());
     entry.revertables.forEach((r) => r.revert());
     for (const snapshot of entry.snapshots) {
@@ -360,6 +439,8 @@ class RevealRegistry {
         if (snapshot.text !== undefined) target.textContent = snapshot.text;
         snapshot.reset?.();
         this.putBack(snapshot, restore);
+        // Back at rest, so print shows it as it is.
+        target.removeAttribute(pendingAttribute);
       }
       if (!this.animating(target)) this.settle(target);
     }

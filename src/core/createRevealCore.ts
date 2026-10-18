@@ -188,6 +188,36 @@ export function createRevealCore(
     if (owned(el)) delete marks(el)[armedKey];
   };
 
+  // Before printing, this instance's reveals show at their end, and
+  // afterwards the ones that play again go back (#15). Listened for from the
+  // first init() until a bare destroy().
+  // A second `beforeprint` before `afterprint` is ignored, so what `after`
+  // puts back is what was there before the first.
+  let printing = false;
+  const beforePrint = (): void => {
+    if (printing) return;
+    printing = true;
+    registry.print(owned, "before");
+  };
+  const afterPrint = (): void => {
+    if (!printing) return;
+    printing = false;
+    registry.print(owned, "after");
+  };
+  let listening = false;
+  const listenForPrint = (): void => {
+    if (listening || typeof window === "undefined") return;
+    listening = true;
+    window.addEventListener("beforeprint", beforePrint);
+    window.addEventListener("afterprint", afterPrint);
+  };
+  const stopListeningForPrint = (): void => {
+    if (!listening) return;
+    listening = false;
+    window.removeEventListener("beforeprint", beforePrint);
+    window.removeEventListener("afterprint", afterPrint);
+  };
+
   // The defaults a type's init gets: its own typeDefaults over the global
   // ones it doesn't ignore, both read by the same rules as attributes, so an
   // unset or unreadable value doesn't hide the one below it.
@@ -287,8 +317,14 @@ export function createRevealCore(
       // Claim the unclaimed elements and group them by type, reading each
       // type once. Elements an earlier call claimed are that call's to arm.
       const groups = new Map<string, HTMLElement[]>();
+      listenForPrint();
+      let rescanned = false;
       for (const el of found) {
-        if (claims.has(el)) continue;
+        // Armed by an earlier call: a batch may have new items to take on.
+        if (claims.has(el)) {
+          if (owned(el) && registry.rescan(el)) rescanned = true;
+          continue;
+        }
         claims.set(el, scan.claim);
         if (el.isConnected) scan.connected.add(el);
         const type = el.dataset.reveal ?? "";
@@ -296,6 +332,8 @@ export function createRevealCore(
         if (group) group.push(el);
         else groups.set(type, [el]);
       }
+
+      if (rescanned) void scheduleRefresh();
 
       // Each type is armed as soon as it resolves, so one slow or failed
       // chunk doesn't hold back the rest.
@@ -324,6 +362,7 @@ export function createRevealCore(
         claims = new WeakMap();
         token.live = false;
         token = { live: true };
+        stopListeningForPrint();
       } else {
         killed = registry.kill(container, { restore, owned });
         // Forget every matching element so init() can re-animate it later.

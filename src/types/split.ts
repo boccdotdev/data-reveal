@@ -3,7 +3,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { registry } from "../core/registry.js";
 import { finish, unhide } from "../core/visibility.js";
-import { revealCallbacks, revealedAtOnce } from "../internal/finish.js";
+import { markPending, printsAtEnd, revealCallbacks, revealedAtOnce } from "../internal/finish.js";
 import { option, options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration, SplitAria, SplitType } from "../internal/types.js";
@@ -132,8 +132,10 @@ export const init: RevealInit = (el, ctx) => {
       return tween;
     },
   };
+  markPending(el);
   const split = SplitText.create(el, vars);
   registry.addRevert(el, split);
+  printsAtEnd(el, ctx, () => tween);
 
   // autoSplit re-splits lines on the font set's `loadingdone` event, which
   // WebKit doesn't fire for a font that starts loading after the split. Its

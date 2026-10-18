@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { shownOpacity, unhide } from "../core/visibility.js";
-import { revealCallbacks, revealedAtOnce } from "../internal/finish.js";
+import { markPending, printsAtEnd, revealCallbacks, revealedAtOnce } from "../internal/finish.js";
 import { capOpacity } from "../internal/opacity.js";
 import { options } from "../internal/options.js";
 import { ownTransform } from "../internal/transform.js";
@@ -47,6 +47,7 @@ export const init: RevealInit = (el, ctx) => {
 
   gsap.set(el, fromVars);
 
+  markPending(el);
   const tween = gsap.to(el, {
     opacity,
     modifiers: capOpacity(opacity),
@@ -59,6 +60,7 @@ export const init: RevealInit = (el, ctx) => {
   });
 
   registry.track(el, tween);
+  printsAtEnd(el, ctx, () => tween);
 };
 
 export const rotate: RevealRegistration = { type: "rotate", init };

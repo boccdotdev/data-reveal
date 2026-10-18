@@ -21,11 +21,15 @@
   only make it pop in late.
 
   On paper nothing scrolls, so a reveal still waiting or partway through
-  would print blank or half shown. The print rules show those at their end:
-  no opacity, transform, clip-path or filter from the reveal on the element,
-  on a batch's items or on split's pieces. A finished reveal has already
-  handed these back to the element's own CSS, so it prints as styled. Layout
-  is left alone.
+  would print blank or half shown. Before printing, the package plays each
+  one to its end. Where printing doesn't announce itself first (some PDF
+  tools), the print rules below show what isn't at its end in full instead:
+  reveals marked data-reveal-pending (a play-once reveal that hasn't
+  finished, a reverse one that's played out, or a batch item of either) and
+  split's pieces in them lose the reveal's opacity, transform, clip-path and
+  filter, along with their own. A split element only has its pieces shown,
+  unless it's a batch item, which the batch hides as a whole. Reveals at their end, finished ones and
+  parallax keep their own styles, and layout is left alone.
 */
 @media screen and (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   [data-reveal]:not([data-reveal="parallax"], [data-reveal-state]) {
@@ -42,12 +46,24 @@
 }
 
 @media print {
-  [data-reveal-state="ready"],
-  [data-reveal="batch"][data-reveal-state="ready"] > *,
-  [data-reveal="batch"][data-reveal-state="ready"] [data-reveal-item],
-  .data-reveal-line,
-  .data-reveal-word,
-  .data-reveal-char {
+  [data-reveal-pending]:not([data-reveal="split"]),
+  [data-reveal-item][data-reveal-pending],
+  [data-reveal="split"][data-reveal-pending] .data-reveal-line,
+  [data-reveal="split"][data-reveal-pending] .data-reveal-word,
+  [data-reveal="split"][data-reveal-pending] .data-reveal-char {
+    opacity: 1 !important;
+    transform: none !important;
+    translate: none !important;
+    rotate: none !important;
+    scale: none !important;
+    clip-path: none !important;
+    filter: none !important;
+  }
+
+  /* A split that is one of the children a batch without data-reveal-item
+     falls back to. A rule of its own, so a browser without :has() drops only
+     this one. */
+  [data-reveal="batch"]:not(:has([data-reveal-item])) > [data-reveal-pending] {
     opacity: 1 !important;
     transform: none !important;
     translate: none !important;

@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
-import { revealCallbacks, revealedAtOnce } from "../internal/finish.js";
+import { markPending, printsAtEnd, revealCallbacks, revealedAtOnce } from "../internal/finish.js";
 import { options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
@@ -35,6 +35,7 @@ export const init: RevealInit = (el, ctx) => {
   gsap.set(el, { clipPath: fromClip[direction] ?? fromClip.up });
   unhide(el);
 
+  markPending(el);
   const tween = gsap.to(el, {
     clipPath: "inset(0 0 0 0)",
     duration,
@@ -45,6 +46,7 @@ export const init: RevealInit = (el, ctx) => {
   });
 
   registry.track(el, tween);
+  printsAtEnd(el, ctx, () => tween);
 };
 
 export const clip: RevealRegistration = { type: "clip", init };

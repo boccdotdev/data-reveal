@@ -61,7 +61,12 @@ It only hides content while that's safe:
 
 `parallax` is never hidden, because it has no hidden starting state.
 
-It also has print rules. Nothing scrolls on paper, so a reveal still waiting below the fold, or partway through, would print blank or half shown. In print, every element whose reveal hasn't finished (`data-reveal-state="ready"`), the items of such a `batch` and `split`'s pieces drop the reveal's `opacity`, `transform`, `translate`, `rotate`, `scale`, `clip-path` and `filter`, so they print in full. That takes their own values of those properties with them, such as a `.muted` opacity, until the reveal has played. A finished reveal has already handed them back, so it prints as your CSS has it, and the rules touch nothing else on the page or its layout. A `counter` that hasn't counted yet prints the number it starts from.
+### Printing
+
+Nothing scrolls on paper, so a reveal still waiting below the fold, or partway through, would print blank or half shown. Two things stop that:
+
+- **Before printing** (the browser's `beforeprint` event), every reveal an instance armed plays to its end at once. A play-once reveal finishes as it would on screen, so it hands its styles back and prints exactly as your CSS has it, and a `counter` shows the number it counts to. They stay finished afterwards. A `data-reveal-reverse` reveal shows at its end too, then goes back to where it was after printing (`afterprint`), so scrolling still plays it in and out. `parallax` prints where the scroll has it. This needs no stylesheet.
+- **Print rules in `reveal.css`**, for printing that doesn't fire `beforeprint` first, such as some PDF tools. They show in full whatever isn't at its end, marked `data-reveal-pending`: a play-once reveal that hasn't finished, a reverse one that has played out, a `batch` item of either, and `split`'s pieces. Those lose the reveal's `opacity`, `transform`, `translate`, `rotate`, `scale`, `clip-path` and `filter`, and their own values of those properties with them, such as a `.muted` opacity. Reveals at their end, finished reveals and `parallax` keep their own styles, and nothing else on the page, or its layout, is touched. A `counter` that hasn't counted prints the number it starts from on this path.
 
 Import the stylesheet from CSS that loads in `<head>`. Imported from JavaScript, it can arrive too late to stop the flash.
 
@@ -170,6 +175,8 @@ A play-once reveal lets go of everything it held once it finishes, because it ha
 | `failed` | The type's module didn't load or its init threw. |
 
 More values may come later, so test for the attribute being there, as `reveal.css` does, rather than for one value. To style finished elements, use `[data-reveal-state="done"]`.
+
+A second attribute, `data-reveal-pending`, is on an element, or a `batch` item, whose reveal isn't at its end: a play-once reveal until it finishes, a reverse one while it's played out. The print rules use it (see [Printing](#printing)).
 
 ## Defaults
 
@@ -306,7 +313,7 @@ The pieces are `<span>`s with the classes `data-reveal-char`, `data-reveal-word`
 Splitting collapses white space, so line breaks that come from `white-space: pre-line` disappear while the element is split. Use `<br>` for line breaks in split text. Reduced motion doesn't split at all.
 
 ### `batch`
-Staggered reveal of many children as they enter together. Targets elements marked `data-reveal-item`, or falls back to direct children.
+Staggered reveal of many children as they enter together. Targets elements marked `data-reveal-item`, or falls back to direct children, leaving out ones that don't render: `<template>` (Alpine's `x-for`, say), `<script>`, `<style>`, `<link>`, `<meta>` and `<noscript>`.
 
 | Attribute | Default | Notes |
 |-----------|---------|-------|
@@ -321,6 +328,17 @@ With `data-reveal-reverse`, items ease out with `power2.in`. An ease you set app
   <li data-reveal-item>Two</li>
 </ul>
 ```
+
+An item with no size when the batch arms, such as one in a container that's `display: none`, one hidden below a breakpoint, one in a closed `<details>` or a slide in a carousel track that hasn't been sized yet, waits until it gets one and then reveals as it's scrolled to, like the rest. It stays hidden meanwhile and keeps the batch from finishing (`data-reveal-state` stays `ready`), and costs nothing. An item you take out of the page before it reveals, as filter or pagination code does, stops counting at the next `init()` over the batch and is put back as written, so if you put it back in later it just shows. Without `data-reveal-item`, a child with no size, such as an infinite scroll's 0-height sentinel, is left as it is instead and doesn't hold the batch up. It joins the batch if it gets a size before the batch is done, and otherwise just shows when it does.
+
+To add items later, as a load-more or infinite scroll does, append them and call `init()` over the batch again, on the container or anything around it. The new items reveal with the batch's settings, staggered among themselves as they enter, and the ones already shown stay as they are. Items still waiting from before and new ones that enter at the same moment get a stagger each, not one between them.
+
+```ts
+list.append(...newItems);
+await reveal.init(list);
+```
+
+Call `init()` in the same task as the append, before the browser paints. New items in view that have already painted are hidden and replay, so they blink. That happens when `init()` runs from a callback that comes after the content is on screen, such as htmx's `onLoad` after settling, or an "images loaded" callback.
 
 ### `blur`
 Fade in from a blur.

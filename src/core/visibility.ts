@@ -6,7 +6,11 @@ import { registry } from "./registry.js";
 // then, so `reveal.css` no longer hides the element: if it still settles at 0,
 // another rule is hiding it (e.g. a site's own `[data-reveal] { opacity: 0 }`),
 // so show it. Any other value is the element's own opacity and is left alone.
+// So is an element a reveal has hidden as its starting state (a split that
+// is also a batch item, skipped by an instance without split): that reveal
+// shows it.
 export function unhide(el: HTMLElement): void {
+  if (registry.hiddenByReveal(el)) return;
   if (restingOpacity(el) === "0") el.style.opacity = "1";
 }
 

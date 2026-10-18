@@ -18,6 +18,8 @@
     <!-- Opacity 0.6 of their own. The first one's fade starts before the batch does, the second one's after. -->
     <li id="muted" class="muted" data-reveal-item data-reveal="fade" data-reveal-duration="0.2" data-reveal-start="top bottom">batch item and fade, starting first</li>
     <li id="muted-later" class="muted" data-reveal-item data-reveal="fade" data-reveal-duration="0.2" data-reveal-start="top 30%">batch item and fade, starting second</li>
+    <!-- Its fade starts first and slowly, so the site can stop it partway. -->
+    <li id="killed" data-reveal-item data-reveal="fade" data-reveal-duration="3" data-reveal-start="top bottom">batch item and slow fade, stopped by the site</li>
   </ul>
   <div class="gap"></div>
   <script type="module" src="./harness.js"></script>

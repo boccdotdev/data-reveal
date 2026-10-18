@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
 import { unhide } from "../core/visibility.js";
-import { revealed, revealedAtOnce } from "../internal/finish.js";
+import { printsAtEnd, revealed, revealedAtOnce } from "../internal/finish.js";
 import { option, options } from "../internal/options.js";
 import { isReverse, revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
@@ -65,6 +65,8 @@ export const init: RevealInit = (el, ctx) => {
   });
 
   registry.track(el, tween);
+  // Printing shows the number it counts to.
+  printsAtEnd(el, ctx, () => tween);
 };
 
 export const counter: RevealRegistration = { type: "counter", init };

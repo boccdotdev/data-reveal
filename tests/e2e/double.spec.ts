@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, initResult, jumpAtFinish, leftovers, nothingLeft, revealDone, sampleReveal, scrollTo, test } from "./helpers";
+import { expect, frames, initResult, jumpAtFinish, leftovers, nothingLeft, revealDone, sampleReveal, scrollTo, test } from "./helpers";
 
 // Which type arms first: batch, as the outer element, unless its chunk is late.
 for (const [order, faults] of [
@@ -94,6 +94,22 @@ for (const [order, faults] of [
       const dips = opacities.filter((opacity, i) => i > 0 && opacity < opacities[i - 1] - 0.02);
       expect(dips).toEqual([]);
       expect(opacities[opacities.length - 1]).toBe(1);
+    });
+
+    test("a reveal waiting on the element still finishes when the site stops the first one partway", async ({ page }) => {
+      const killed = page.locator("#killed");
+      await killed.evaluate((element) => window.scrollBy(0, element.getBoundingClientRect().top - window.innerHeight * 0.95));
+      // The fade has started; then the batch reaches the item and leaves it to the fade.
+      await expect.poll(() => killed.evaluate((element) => Number(getComputedStyle(element).opacity))).toBeGreaterThan(0);
+      await killed.evaluate((element) => window.scrollBy(0, element.getBoundingClientRect().top - window.innerHeight * 0.5));
+      // Long enough for the batch to have started on the item and left it to
+      // the fade. Killed before it starts, the batch's own tween would go too.
+      for (let i = 0; i < 4; i++) await frames(page);
+      await page.evaluate(async () => {
+        const { gsap } = await import("gsap");
+        gsap.killTweensOf("#killed");
+      });
+      await revealDone(page.locator("#list"), 10_000);
     });
 
     for (const [id, first] of [

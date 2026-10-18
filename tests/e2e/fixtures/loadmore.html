@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Load more</title>
+  <style>
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+    .grid li { height: 40px; background: #ddd; }
+    .list { margin: 0 0 16px; padding: 0; list-style: none; }
+    .list li { height: 40px; margin: 0 0 4px; background: #ddd; }
+    .list .spacer { height: 2000px; background: none; }
+    .list .sentinel { height: 0; }
+    .tall { height: 500px !important; }
+  </style>
+</head>
+<body>
+  <ul id="grid" class="grid" data-reveal="batch" data-reveal-duration="0.4" data-reveal-stagger="0.15">
+    <li data-reveal-item>1</li><li data-reveal-item>2</li><li data-reveal-item>3</li>
+    <li data-reveal-item>4</li><li data-reveal-item>5</li><li data-reveal-item>6</li>
+  </ul>
+  <ul id="slow" class="grid" data-reveal="batch" data-reveal-duration="2" data-reveal-stagger="0">
+    <li data-reveal-item>1</li><li data-reveal-item>2</li><li data-reveal-item>3</li>
+  </ul>
+  <!-- Falls back to its children; the <template> and the sentinel aren't items. -->
+  <ul id="templated" class="list" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <template><li>from a template</li></template>
+    <li>one</li>
+    <li>two</li>
+    <li class="sentinel"></li>
+  </ul>
+  <!-- Keeps its end state, so it's never released. -->
+  <ul id="kept" class="list" data-reveal="batch" data-reveal-keep data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li>one</li>
+    <li id="grows" class="sentinel"></li>
+  </ul>
+  <div class="gap"></div>
+  <div id="below-grid" class="box" data-reveal="fade" data-reveal-duration="0.2">fade below the grid</div>
+  <!-- x has a fade of its own that starts late, near the top of the viewport. -->
+  <ul id="waits" class="list" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li data-reveal-item>y</li>
+    <li id="x" data-reveal-item data-reveal="fade" data-reveal-duration="0.2" data-reveal-start="top 10%">x</li>
+    <li class="spacer"></li>
+  </ul>
+  <div class="gap"></div>
+  <!-- A filter detaches c before it reveals, and puts it back later. -->
+  <ul id="filtered" class="list" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li data-reveal-item>a</li>
+    <li data-reveal-item>b</li>
+    <li class="spacer"></li>
+    <li id="c" data-reveal-item>c</li>
+  </ul>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

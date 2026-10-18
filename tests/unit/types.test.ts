@@ -101,6 +101,10 @@ beforeEach(() => {
   recorded.pieces = [];
   recorded.splitReverted = 0;
   document.body.innerHTML = "";
+  // happy-dom lays nothing out, so give list items the box batch looks for
+  // before it watches them. A test takes it away to stand for one without.
+  HTMLLIElement.prototype.checkVisibility = () => true;
+  HTMLLIElement.prototype.getBoundingClientRect = () => ({ width: 100, height: 20 }) as DOMRect;
 });
 
 function element(attributes = ""): HTMLElement {
@@ -428,7 +432,7 @@ describe("batch", () => {
   }
 
   function easeOf(callback: unknown): unknown {
-    (callback as (group: Element[]) => void)([]);
+    (callback as (group: Element[]) => void)([document.querySelector("li") as Element]);
     return recorded.to[recorded.to.length - 1].ease;
   }
 
@@ -462,7 +466,7 @@ describe("batch", () => {
     batch(document.getElementById("list") as HTMLElement, { reduced: false, defaults: {} });
     document.head.innerHTML = "";
     const vars = recorded.batch[recorded.batch.length - 1] as Vars;
-    (vars.onEnter as (group: Element[]) => void)([]);
+    (vars.onEnter as (group: Element[]) => void)(Array.from(document.querySelectorAll("li")));
     const opacity = recorded.to[recorded.to.length - 1].opacity as (index: number, item: Element) => number;
 
     expect(opacity(0, document.getElementById("plain") as Element)).toBe(1);
@@ -521,6 +525,25 @@ describe("batch", () => {
 
     expect(first.kill).toHaveBeenCalledWith([item]);
     for (const tween of recorded.to.slice(-2)) expect(tween.overwrite).toBeUndefined();
+  });
+
+  it("after printing, leaves an item a newer tween took over while printing, and puts the rest back", () => {
+    registry.killAll();
+    html(`<ul id="list" data-reveal-reverse><li id="one">one</li><li id="two">two</li></ul>`);
+    const list = document.getElementById("list") as HTMLElement;
+    registry.snapshot(list, list);
+    batch(list, { reduced: false, defaults: {} });
+    const vars = recorded.batch[recorded.batch.length - 1] as Vars;
+
+    registry.print(() => true, "before");
+    // Scrolled while printing: the first item enters with a tween of its own.
+    (vars.onEnter as (group: Element[]) => void)([document.getElementById("one") as Element]);
+    const setBefore = recorded.set.length;
+    registry.print(() => true, "after");
+    const putBack = recorded.set.slice(setBefore).map((vars) => Object.keys(vars).sort().join());
+    expect(putBack).toEqual(["opacity,y"]);
+    expect(document.getElementById("one")?.hasAttribute("data-reveal-pending")).toBe(false);
+    expect(document.getElementById("two")?.hasAttribute("data-reveal-pending")).toBe(true);
   });
 
   it("uses the built-in start unless one is set", () => {

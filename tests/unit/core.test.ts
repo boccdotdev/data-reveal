@@ -599,6 +599,35 @@ describe("two instances on one page (#54)", () => {
   });
 });
 
+describe("printing (#15)", () => {
+  it("shows the instance's reveals at their end before printing, puts back what plays again after, and stops listening on a bare destroy()", async () => {
+    const { createRevealCore, registry } = await loadCore();
+    const printed: string[] = [];
+    const reveal = createRevealCore(() => (el) => {
+      registry.add(el, { kill: () => {} });
+      registry.onPrint(el, { before: () => printed.push(`before ${el.id}`), after: () => printed.push(`after ${el.id}`) });
+    });
+    html(`<div id="a" data-reveal="fade"></div>`);
+    await reveal.init();
+
+    // A second beforeprint before afterprint changes nothing.
+    window.dispatchEvent(new Event("beforeprint"));
+    window.dispatchEvent(new Event("beforeprint"));
+    window.dispatchEvent(new Event("afterprint"));
+    window.dispatchEvent(new Event("afterprint"));
+    expect(printed).toEqual(["before a", "after a"]);
+
+    reveal.destroy();
+    window.dispatchEvent(new Event("beforeprint"));
+    expect(printed).toHaveLength(2);
+    const removed = vi.spyOn(window, "removeEventListener");
+    await reveal.init();
+    reveal.destroy();
+    expect(removed.mock.calls.map(([type]) => type)).toEqual(["beforeprint", "afterprint"]);
+    removed.mockRestore();
+  });
+});
+
 describe("destroy() and what types left behind", () => {
   // A stand-in type that sets a from-state inline, as the built-in ones do.
   async function setup() {
