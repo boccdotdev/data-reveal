@@ -563,7 +563,7 @@ document.addEventListener("astro:before-swap", () => {
 document.addEventListener("astro:after-swap", () => reveal.init());
 ```
 
-A bare `destroy()` would forget the persisted elements too, so they'd replay on every navigation. `astro:after-swap` fires as the new page goes in, before it's shown. `astro:page-load` comes once it's visible, too late for content already on screen.
+A bare `destroy()` would forget the persisted elements too, so they'd replay on every navigation. `astro:after-swap` fires as the new page goes in, before it's shown. `astro:page-load` comes once it's visible, too late for content already on screen. Astro runs a bundled script once per visit, not on each navigation, so the instance's first `init()` covers the page the visitor lands on and `astro:after-swap` covers every page after it. Your own code that binds to elements on the page still belongs in an `astro:page-load` listener.
 
 ### Lenis
 
