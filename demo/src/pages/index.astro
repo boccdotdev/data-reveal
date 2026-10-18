@@ -1,0 +1,56 @@
+---
+import Site from "../layouts/Site.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import TypeIcon from "../components/TypeIcon.astro";
+import { installSnippet } from "../lib/code";
+import { defaultEngine } from "../lib/engines";
+import { types } from "../lib/types";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const repo = "https://github.com/boccdotdev/data-reveal";
+---
+
+<Site
+  title="data-reveal"
+  description="Scroll reveals from HTML attributes. Try every animation type, tune it, and copy the code."
+  current="overview"
+>
+  <header class="home-head">
+    <h1>Scroll reveals from HTML attributes.</h1>
+    <p class="intro">
+      Give an element a <code class="mono" translate="no">data-reveal</code> attribute and it animates as it
+      scrolls into view. A page loads the code for the animation types it uses and no others. It runs on GSAP and
+      ScrollTrigger.
+    </p>
+    <CodeBlock label="Install" lang="bash" code={installSnippet(defaultEngine)} />
+    <p class="home-links mono">
+      <a href={repo}>Source on GitHub</a>
+      <a href={`${base}showcase/`} data-nav>Sites built with it</a>
+    </p>
+  </header>
+
+  <section class="index" aria-labelledby="types-title">
+    <h2 id="types-title">Types</h2>
+    <ul class="type-list" role="list">
+      <li class="type-row type-row-head mono" aria-hidden="true">
+        <span>Type</span>
+        <span>What it does</span>
+        <span></span>
+      </li>
+      {
+        types.map((type) => (
+          <li class="type-row">
+            <a class="type-link mono" href={`${base}${type.id}/`} translate="no" data-nav>
+              <TypeIcon type={type.id} size={20} />
+              {type.id}
+            </a>
+            <span class="type-summary">{type.summary}</span>
+            <span class="type-arrow mono" aria-hidden="true">
+              --&gt;
+            </span>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</Site>

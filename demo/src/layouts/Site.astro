@@ -1,0 +1,83 @@
+---
+import "../styles/site.css";
+import Base from "./Base.astro";
+import Nav from "../components/Nav.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  /** The page being shown, for the nav: "overview", "showcase" or a type's id. */
+  current: string;
+  /** Whether the page has a settings pane that can be hidden. */
+  settings?: boolean;
+  /** Stays out of search results, for review pages. */
+  index?: boolean;
+}
+
+const { title, description, current, settings = false, index = true } = Astro.props;
+
+// Between pages the content fades and rises a little. The nav stays put, and
+// with reduced motion nothing moves.
+const swap = {
+  old: { name: "demo-leave", duration: "120ms", easing: "ease-out", fillMode: "both" },
+  new: { name: "demo-enter", duration: "200ms", easing: "cubic-bezier(0.23, 1, 0.32, 1)", fillMode: "both" },
+};
+const rise = { forwards: swap, backwards: swap };
+---
+
+<Base title={title} description={description} index={index}>
+  <script is:inline slot="head">
+    // The panels start as this browser left them: the nav as a rail of
+    // icons, the settings hidden.
+    try {
+      const root = document.documentElement;
+      if (localStorage.getItem("data-reveal-demo:nav") === "rail") root.setAttribute("data-nav-rail", "");
+      if (localStorage.getItem("data-reveal-demo:settings") === "hidden") root.setAttribute("data-settings-hidden", "");
+    } catch {}
+  </script>
+  <a class="skip-link mono" href="#content">Skip to the content</a>
+  <div class="site">
+    <Nav current={current} />
+    <div class="column">
+      <div class="panel-bar mono">
+        <button type="button" class="bar-button" aria-expanded="true" aria-controls="site-nav" data-panel-toggle="nav">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" class="panel-glyph panel-glyph-start">
+            <path d="M3 4h14v12H3z M8 4v12" />
+            <path class="panel-glyph-fill" d="M3 4h5v12H3z" />
+          </svg>
+          Navigation
+        </button>
+        {
+          settings && (
+            <button
+              type="button"
+              class="bar-button"
+              aria-expanded="true"
+              aria-controls="settings-pane"
+              data-panel-toggle="settings"
+            >
+              Settings
+              <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" class="panel-glyph">
+                <path d="M3 4h14v12H3z M12 4v12" />
+                <path class="panel-glyph-fill" d="M12 4h5v12h-5z" />
+              </svg>
+            </button>
+          )
+        }
+      </div>
+      <p class="motion-note mono">
+        Your device asks for reduced motion, so each element shows in place without animating.
+      </p>
+      <main id="content" class="content" transition:animate={rise}>
+        <slot />
+      </main>
+      <slot name="pager" />
+    </div>
+    <slot name="settings" />
+  </div>
+  <script>
+    // The panels change first, so the sound can tell whether one opened.
+    import "../scripts/site";
+    import "../scripts/sound";
+  </script>
+</Base>

@@ -1,0 +1,138 @@
+/* Every page: fonts, colours, a small reset. */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --black: #282828;
+  --white: #f2f2f2;
+  --grey-light: #e1e1e1;
+  --grey-mid: #b8bdb8;
+  --grey-dark: #8f948f;
+
+  /* Dark is the house look; light swaps the two. */
+  --bg: light-dark(var(--white), var(--black));
+  --text: light-dark(var(--black), var(--white));
+  --rule: light-dark(var(--grey-mid), var(--grey-dark));
+  /* Quiet text. #8f948f is too faint on the light background for small
+     text, so light mode takes a darker step of the same grey. */
+  --muted: light-dark(color-mix(in oklch, var(--grey-dark), var(--black) 45%), var(--grey-dark));
+  --raised: light-dark(color-mix(in oklch, var(--white), var(--black) 5%), color-mix(in oklch, var(--black), var(--white) 6%));
+  /* The edge of a control (a segment, a switch, a slider's track, a field).
+     The rule colour is too faint for that on the light background, so light
+     mode takes the quiet text colour, over 3:1 in both themes. */
+  --control-line: light-dark(var(--muted), var(--grey-dark));
+  /* Quiet text on a raised surface, a step lighter in dark mode to keep its contrast. */
+  --muted-raised: light-dark(var(--muted), var(--grey-mid));
+
+  --font-sans: "General Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --hover: light-dark(var(--muted), var(--grey-mid));
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  interpolate-size: allow-keywords;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 1rem / 1.5rem var(--font-sans);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+p,
+figure,
+ul,
+ol,
+pre,
+fieldset {
+  margin: 0;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+a,
+label {
+  touch-action: manipulation;
+}
+
+button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

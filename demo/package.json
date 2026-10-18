@@ -1,0 +1,26 @@
+{
+  "name": "data-reveal-demo",
+  "private": true,
+  "type": "module",
+  "description": "Playground for @boccdotdev/data-reveal. Build the package at the repo root first.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@boccdotdev/data-reveal": "file:..",
+    "@foleyjs/core": "^2.9.0",
+    "astro": "^7.4.0",
+    "gsap": "^3.15.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@playwright/test": "1.64.1",
+    "shiki": "^4.5.0",
+    "typescript": "^6.0.0",
+    "wrangler": "4.145.0"
+  }
+}

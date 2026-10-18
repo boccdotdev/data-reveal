@@ -1,0 +1,11 @@
+// Cloudflare Workers, serving the built site as static assets. No Worker
+// script: every request is a file in dist/, and a path with no file gets
+// dist/404.html with a 404 status. See README.md for the build.
+{
+  "name": "data-reveal-demo",
+  "compatibility_date": "2026-10-18",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}

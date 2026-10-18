@@ -1,0 +1,52 @@
+---
+// The element a type's example animates. The page shows it as written, then
+// builds a fresh copy from a <template> of it each time the settings change,
+// with them as `data-reveal-*` attributes.
+import type { RevealType } from "@boccdotdev/data-reveal";
+
+interface Props {
+  type: RevealType;
+}
+
+const { type } = Astro.props;
+const cards: Partial<Record<RevealType, [string, string]>> = {
+  fade: ["Fade", "Fades in while it moves into place."],
+  scale: ["Scale", "Fades in while it scales up."],
+  blur: ["Blur", "Comes into focus as it fades in."],
+  rotate: ["Rotate", "Turns into place in 3D."],
+  slide: ["Slide", "Slides in from a full length away."],
+};
+const card = cards[type];
+const tiles = ["01", "02", "03", "04", "05", "06"];
+---
+
+{
+  card && (
+    <article class="card" data-reveal={type}>
+      <h3>{card[0]}</h3>
+      <p>{card[1]}</p>
+    </article>
+  )
+}
+{type === "split" && <p class="headline" data-reveal="split">Text that arrives piece by piece as you scroll.</p>}
+{
+  type === "batch" && (
+    <ul class="tiles" data-reveal="batch">
+      {tiles.map((tile) => (
+        <li class="tile mono" data-reveal-item>
+          {tile}
+        </li>
+      ))}
+    </ul>
+  )
+}
+{type === "clip" && <div class="picture" role="img" aria-label="A picture wiped into view" data-reveal="clip" />}
+{type === "counter" && <p class="figure" data-reveal="counter">12480</p>}
+{
+  type === "parallax" && (
+    <div class="track">
+      <div class="ghost" aria-hidden="true" />
+      <div class="picture" role="img" aria-label="A picture that drifts with the scroll" data-reveal="parallax" />
+    </div>
+  )
+}

@@ -1,0 +1,8 @@
+# Astro's generated types
+.astro/
+
+# The test build with a showcase entry
+tests/.showcase-dist/
+
+# Wrangler's local state
+.wrangler/

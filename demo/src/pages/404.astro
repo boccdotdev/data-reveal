@@ -1,0 +1,17 @@
+---
+// Served by Cloudflare for any path with no file (`not_found_handling` in
+// wrangler.jsonc), with a 404 status.
+import Site from "../layouts/Site.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+---
+
+<Site title="Not found · data-reveal" description="There's no page at this address." current="none" index={false}>
+  <header class="page-head">
+    <h1>Not found</h1>
+    <p class="summary">There's no page at this address.</p>
+  </header>
+  <p class="home-links mono">
+    <a href={base} data-nav>Go to the overview</a>
+  </p>
+</Site>

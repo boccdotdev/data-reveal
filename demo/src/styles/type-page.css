@@ -1,0 +1,623 @@
+/* A type's page: tabs between the example and its code, the settings
+   beside them (a drawer on narrow screens), and the example running in the
+   page, so the window's scroll plays it. */
+
+.type-head {
+  display: grid;
+  gap: 0.5rem;
+  max-inline-size: 40rem;
+  padding-block-end: 2rem;
+}
+
+.type-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.summary {
+  color: var(--muted);
+}
+
+.views {
+  min-inline-size: 0;
+}
+
+/* The tabs: a sticky row of their own under the bar along the top, with
+   the same rule. */
+
+.tabs-row {
+  position: sticky;
+  inset-block-start: var(--bar-height);
+  z-index: 5;
+  display: flex;
+  align-items: stretch;
+  block-size: var(--bar-height);
+  margin-inline: calc(-1 * var(--gutter));
+  padding-inline: var(--gutter);
+  border-block-end: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+}
+
+[role="tab"] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+[role="tab"][aria-selected="true"] {
+  color: var(--text);
+}
+
+/* Drawn over the row's bottom rule. */
+[role="tab"][aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: -1px;
+  block-size: 2px;
+  background: currentColor;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [role="tab"]:hover {
+    color: var(--text);
+  }
+}
+
+/* A panel shown from its top lands just under both sticky rows. */
+.example,
+.code {
+  scroll-margin-block-start: calc(2 * var(--bar-height));
+}
+
+@media (width >= 60rem) {
+  .tabs-row {
+    margin-inline: -2.5rem -2rem;
+    padding-inline: 2.5rem 2rem;
+  }
+}
+
+@media (width < 60rem) {
+  .tabs-row {
+    inset-block-start: 3.5rem;
+  }
+
+  .example,
+  .code {
+    scroll-margin-block-start: calc(3.5rem + var(--bar-height));
+  }
+}
+
+/* Replay belongs to the example: at its top right, and it stays in reach
+   while the example scrolls by. The row has no height of its own. */
+.example-tools {
+  position: sticky;
+  inset-block-start: calc(2 * var(--bar-height) + 1rem);
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  block-size: 0;
+  margin-block-start: 1rem;
+}
+
+@media (width < 60rem) {
+  .example-tools {
+    inset-block-start: calc(3.5rem + var(--bar-height) + 1rem);
+  }
+}
+
+.replay {
+  display: flex;
+  align-items: center;
+  block-size: 2.75rem;
+  padding-inline: 1rem;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .replay:hover {
+    border-color: var(--text);
+  }
+}
+
+/* The example: a screen of lead-in, the element just below the fold, and a
+   screen after it, so scrolling the page plays it through. */
+
+.example:focus-visible {
+  outline-offset: -2px;
+}
+
+.lead {
+  display: grid;
+  place-items: center;
+  block-size: 100vh;
+}
+
+.hint {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+}
+
+.hint-arrow {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.slot {
+  inline-size: min(100%, 32rem);
+  margin-inline: auto;
+  /* Slides and turns start outside their box; don't let them scroll the page sideways. */
+  overflow-x: clip;
+}
+
+/* A picture gets more room when the panels are hidden. */
+.slot:has(.picture) {
+  inline-size: min(100%, 48rem);
+}
+
+.tail {
+  block-size: 100vh;
+}
+
+.card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--rule);
+  background: var(--raised);
+}
+
+.card h3 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.card p {
+  color: var(--muted-raised);
+}
+
+.headline {
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  aspect-ratio: 1;
+  padding: 0.75rem;
+  border: 1px solid var(--rule);
+  background: var(--raised);
+  color: var(--muted-raised);
+}
+
+.figure {
+  font-size: 3.5rem;
+  line-height: 1;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* A drawn picture: a sun over a horizon, in the page's own two colours. */
+.picture {
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--rule);
+  background:
+    radial-gradient(circle at 68% 40%, var(--text) 0 13%, transparent calc(13% + 0.5px)),
+    linear-gradient(to bottom, var(--raised) 0 64%, color-mix(in oklch, var(--text) 16%, var(--bg)) 64% 100%);
+}
+
+/* Parallax: the dashed box marks where the picture sits at rest. */
+.track {
+  display: grid;
+  padding-block: 4rem;
+}
+
+.track > * {
+  grid-area: 1 / 1;
+}
+
+.ghost {
+  border: 1px dashed var(--rule);
+}
+
+/* Code: the blocks one after another, with no scrolling of their own but
+   sideways for a long line. */
+
+.code {
+  display: grid;
+  gap: 1.5rem;
+  padding-block: 2rem;
+}
+
+/* One engine's JS and install, shown for the engine the page runs. */
+.code-engine {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.code-engine[hidden] {
+  display: none;
+}
+
+/* The settings controls. The pane around them is part of the page shell
+   (site.css): a column at the right on wide screens, a drawer on narrow ones. */
+
+.settings {
+  display: grid;
+  align-content: start;
+  gap: 2rem;
+}
+
+/* Settings controls */
+
+.field {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.field-head {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.field-head .label {
+  margin-inline-end: auto;
+}
+
+.note {
+  display: grid;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.ease-name {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.reset {
+  justify-self: start;
+  color: var(--muted);
+}
+
+/* Radios drawn as segments and curve tiles. The input covers its
+   label, so the whole of it is the target, and stays the focusable part. */
+
+.segment,
+.curve {
+  position: relative;
+  cursor: pointer;
+}
+
+:is(.segment, .curve) input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+:is(.segment, .curve):has(:focus-visible) {
+  z-index: 1;
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--control-line);
+}
+
+.segment {
+  flex: 1 0 auto;
+  display: grid;
+  place-content: center;
+  padding: 0.375rem 0.5rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.segment + .segment {
+  border-inline-start: 1px solid var(--control-line);
+}
+
+.segment:has(:checked) {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.segment:has(:disabled) {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.segment:has(:checked:disabled) {
+  background: color-mix(in oklch, var(--text) 18%, var(--bg));
+  color: var(--text);
+}
+
+.curves {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.curve {
+  display: grid;
+  justify-items: center;
+  padding-block-end: 0.5rem;
+  border: 1px solid var(--rule);
+  color: var(--muted);
+}
+
+.curve svg {
+  inline-size: 100%;
+  aspect-ratio: 1;
+}
+
+.curve path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.curve span {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.curve:has(:checked) {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* The type's own controls, drawn from the schema */
+
+.group {
+  display: grid;
+  gap: 1rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--rule);
+}
+
+.control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.control .label {
+  color: var(--text);
+}
+
+.control small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.control .segmented {
+  min-inline-size: 9rem;
+}
+
+.control-range [data-output] {
+  color: var(--muted);
+}
+
+.control-range input {
+  grid-column: 1 / -1;
+}
+
+.control input[type="text"],
+.control select {
+  inline-size: 9rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--control-line);
+  border-radius: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: max(16px, 1rem);
+  line-height: 1.5rem;
+}
+
+.control select {
+  appearance: none;
+  padding-inline-end: 1.75rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 0.875rem) 55%,
+    calc(100% - 0.5625rem) 55%;
+  background-size: 0.3125rem 0.3125rem;
+  background-repeat: no-repeat;
+}
+
+.control select option {
+  background: var(--bg);
+  color: var(--text);
+}
+
+input[type="range"] {
+  appearance: none;
+  inline-size: 100%;
+  block-size: 1.5rem;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  block-size: 1px;
+  background: var(--control-line);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  margin-block-start: calc(-0.375rem + 0.5px);
+  border-radius: 50%;
+  background: var(--text);
+}
+
+input[type="range"]::-moz-range-track {
+  block-size: 1px;
+  background: var(--control-line);
+}
+
+input[type="range"]::-moz-range-progress {
+  block-size: 1px;
+  background: var(--text);
+}
+
+input[type="range"]::-moz-range-thumb {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+}
+
+/* The switch is a 44px target; the track and knob are drawn inside it, at
+   its end. */
+input[type="checkbox"][role="switch"] {
+  appearance: none;
+  position: relative;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  margin: 0;
+  border: 0;
+  outline-color: transparent;
+  background: none;
+  cursor: pointer;
+}
+
+input[type="checkbox"][role="switch"]::before,
+input[type="checkbox"][role="switch"]::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+}
+
+input[type="checkbox"][role="switch"]::before {
+  inset-inline-end: 0;
+  inline-size: 2.25rem;
+  block-size: 1.25rem;
+  border: 1px solid var(--control-line);
+}
+
+input[type="checkbox"][role="switch"]::after {
+  inset-inline-start: calc(0.5rem + 4px);
+  inline-size: calc(1.25rem - 8px);
+  block-size: calc(1.25rem - 8px);
+  background: var(--muted);
+}
+
+input[type="checkbox"][role="switch"]:focus-visible::before {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"][role="switch"]:checked::before {
+  border-color: var(--text);
+  background: var(--text);
+}
+
+input[type="checkbox"][role="switch"]:checked::after {
+  translate: 1rem -50%;
+  background: var(--bg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  input[type="checkbox"][role="switch"]::after {
+    transition: translate 160ms var(--ease-out);
+  }
+}
+
+:disabled,
+:disabled + * {
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .curve:not(:has(:checked, :disabled)):hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  .segment:not(:has(:checked, :disabled)):hover {
+    background: color-mix(in oklch, var(--text) 8%, var(--bg));
+  }
+}
+
+:is(.segment, .curve):active {
+  opacity: 0.6;
+}
+
+
+/* Below 60rem everything here is a 44px target. */
+@media (width < 60rem) {
+  .segment,
+  .control select,
+  .control input[type="text"],
+  .reset {
+    min-block-size: 2.75rem;
+  }
+
+  .segment {
+    min-inline-size: 2.75rem;
+  }
+
+  .reset {
+    display: flex;
+    align-items: center;
+  }
+
+  input[type="range"] {
+    block-size: 2.75rem;
+  }
+}
