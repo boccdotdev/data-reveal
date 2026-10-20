@@ -25,15 +25,14 @@ After a change to the package, run `npm run build` at the root again. The site l
 
 The routes:
 
-- `/` is the overview: the install line, a list of the types and a link to the showcase.
+- `/` is the overview: the install line, a list of the types and, once there is a showcase, a link to it.
 - `/fade/`, `/scale/` and so on, one per type. `src/pages/[type].astro` makes them from the list in `src/lib/types.ts`, so a type added there gets a page and a nav link.
-- `/showcase/` lists sites built with the package.
-- `/icons/` shows the type icons for review. Nothing links to it, and search engines are asked to leave it out.
+- `/showcase/` lists sites built with the package. It's built only once the list has a site (see [Showcase](#showcase)).
 - `src/pages/404.astro` builds `404.html`, a plain page with a link to the overview. Cloudflare serves it, with a 404 status, for any address with no file (`not_found_handling` in `wrangler.jsonc`).
 
 The shell, on every page:
 
-- The nav is one box: the wordmark, the overview and showcase, the types with their icons, then GitHub and npm at its foot, and last a row with the Sound switch.
+- The nav is one box: the wordmark, the overview (and the showcase, once there is one), the types with their icons, then GitHub and npm at its foot, and last a row with the Sound switch.
 - On wide screens a bar along the top holds the Navigation button at the left and, on a type page, the Settings button at the right. Navigation folds the nav to a rail of icons, whose names show on hover and focus, and Escape hides a name until another icon is pointed at. Settings hides the settings column. The browser remembers both. One transition on the page grid moves every edge, and once it settles the page calls the reveal's `refresh()`.
 - Below 60rem the nav's own bar has Settings and Menu buttons instead. The menu and the settings open as drawers, one at a time. An open drawer takes focus, the page behind it is inert, and Escape or the button closes it and puts focus back on the button. Every control there is at least 44px to tap.
 
@@ -59,7 +58,7 @@ The parts:
 
 ## Showcase
 
-The list on `/showcase/` comes from `src/data/showcase.ts`. It ships empty, and the page then asks people to add their site. Listing a site names it in public, so add one only with its owner's agreement:
+The list on `/showcase/` comes from `src/data/showcase.ts`. It ships empty, and while it's empty the site has no `/showcase/` page, no Showcase link in the nav and no link from the overview. The first entry brings all three back. Listing a site names it in public, so add one only with its owner's agreement:
 
 ```ts
 import shot from "../assets/showcase/site-name.png";

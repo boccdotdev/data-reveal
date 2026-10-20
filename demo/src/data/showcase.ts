@@ -16,5 +16,6 @@ export interface ShowcaseEntry {
 }
 
 // Sites built with the package, for /showcase/. Listing a site names it in
-// public, so only add one its owner has agreed to.
+// public, so only add one its owner has agreed to. While the list is empty the
+// site has no showcase page and nothing links to one.
 export const showcase: ShowcaseEntry[] = [];

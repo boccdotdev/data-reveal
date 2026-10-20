@@ -7,13 +7,11 @@ import { icons } from "../lib/icons";
 interface Props {
   type: RevealType;
   size?: number;
-  alternate?: boolean;
   class?: string;
 }
 
-const { type, size = 20, alternate = false, class: className } = Astro.props;
-const set = icons[type];
-const parts = alternate && set.alternate ? set.alternate : set.main;
+const { type, size = 20, class: className } = Astro.props;
+const parts = icons[type];
 ---
 
 <svg

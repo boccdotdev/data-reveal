@@ -1,5 +1,4 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
-import { icons } from "../src/lib/icons";
 import { types } from "../src/lib/types";
 
 interface Cue {
@@ -127,7 +126,7 @@ test.describe("type pages", () => {
   test("a type page has one GSAP, and the other pages load none", async ({ page }) => {
     await openType(page, "/split/");
     expect(await page.evaluate(() => (window as { gsapVersions?: string[] }).gsapVersions?.length)).toBe(1);
-    for (const path of ["/", "/showcase/", "/icons/"]) {
+    for (const path of ["/", "/showcase-fixture/showcase/"]) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       expect(await page.evaluate(() => (window as { gsapVersions?: string[] }).gsapVersions), path).toBeUndefined();
@@ -140,9 +139,6 @@ test.describe("navigation", () => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Site" });
     await expect(nav.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
-    await nav.getByRole("link", { name: "Showcase" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Showcase");
-    await expect(nav.getByRole("link", { name: "Showcase" })).toHaveAttribute("aria-current", "page");
     for (const { id, label } of types) {
       await nav.getByRole("link", { name: id, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`/${id}/`));
@@ -152,7 +148,7 @@ test.describe("navigation", () => {
     }
   });
 
-  test("the overview lists every type and links to it and to the showcase", async ({ page }) => {
+  test("the overview lists every type and links to it", async ({ page }) => {
     await page.goto("/");
     const index = page.getByRole("region", { name: "Types" });
     for (const { id, summary } of types) {
@@ -160,8 +156,6 @@ test.describe("navigation", () => {
       await expect(index.getByText(summary)).toBeVisible();
     }
     await expect(index.getByRole("link")).toHaveCount(types.length);
-    await page.getByRole("link", { name: "Sites built with it" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Showcase");
   });
 
   test("previous and next links step through the types", async ({ page }) => {
@@ -380,12 +374,11 @@ test.describe("panels", () => {
 
     // Every page is still a named link, with its icon, in the same order.
     const links = nav.getByRole("link");
-    await expect(links).toHaveText(["Overview", "Showcase", ...types.map((type) => type.id), "GitHub", "npm"]);
+    await expect(links).toHaveText(["Overview", ...types.map((type) => type.id), "GitHub", "npm"]);
     for (const { id } of types) {
       await expect(nav.getByRole("link", { name: id, exact: true }).locator(`svg[data-icon="${id}"]`)).toBeVisible();
     }
     await expect(nav.getByRole("link", { name: "Overview" }).locator("svg")).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Showcase" }).locator("svg")).toBeVisible();
     // The current one is inverted.
     const current = nav.getByRole("link", { name: "fade", exact: true });
     await expect(current).toHaveAttribute("aria-current", "page");
@@ -767,7 +760,6 @@ test.describe("bars", () => {
     await expect(nav.getByRole("link")).toHaveText([
       "data-reveal",
       "Overview",
-      "Showcase",
       ...types.map((type) => type.id),
       "GitHub",
       "npm",
@@ -1030,7 +1022,7 @@ test.describe("sound", () => {
     await expect(sound).toHaveAttribute("aria-checked", "true");
     await sound.click();
     await expect(sound).toHaveAttribute("aria-checked", "false");
-    await page.goto("/showcase/");
+    await page.goto("/fade/");
     await expect(page.getByRole("switch", { name: "Sound" })).toHaveAttribute("aria-checked", "false");
   });
 });
@@ -1221,7 +1213,7 @@ test.describe("narrow screens", () => {
     await page.goto("/fade/");
     await page.getByRole("button", { name: "Menu" }).click();
     const menu = page.locator("#nav-menu");
-    await expect(menu.getByRole("link")).toHaveText(["Overview", "Showcase", ...types.map((type) => type.id), "GitHub", "npm"]);
+    await expect(menu.getByRole("link")).toHaveText(["Overview", ...types.map((type) => type.id), "GitHub", "npm"]);
     await expect(menu.getByRole("link", { name: "npm" })).toBeVisible();
     const npmBottom = await menu.getByRole("link", { name: "npm" }).evaluate((el) => el.getBoundingClientRect().bottom);
     expect(await menu.getByRole("switch", { name: "Sound" }).evaluate((el) => el.getBoundingClientRect().top)).toBeGreaterThan(npmBottom);
@@ -1382,14 +1374,26 @@ test.describe("when things go wrong", () => {
 });
 
 test.describe("showcase", () => {
-  test("shows an invitation while no sites are listed", async ({ page }) => {
-    await page.goto("/showcase/");
-    await expect(page.getByText("No sites are listed yet.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Add your site" })).toHaveAttribute(
-      "href",
-      /github\.com\/boccdotdev\/data-reveal\/issues\/new/,
-    );
-    await expect(page.locator("[data-showcase]")).toHaveCount(0);
+  test.describe("while no sites are listed", () => {
+    test.use({ allowedErrors: /status of 404/ });
+    test("isn't built or linked", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.getByRole("navigation", { name: "Site" }).getByRole("link", { name: "Showcase" })).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "Sites built with it" })).toHaveCount(0);
+      const response = await page.goto("/showcase/");
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Not found");
+    });
+  });
+
+  test("is in the nav and linked from the overview once a site is listed", async ({ page }) => {
+    await page.goto("/showcase-fixture/");
+    await page.getByRole("link", { name: "Sites built with it" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Showcase");
+    const nav = page.getByRole("navigation", { name: "Site" });
+    await expect(nav.getByRole("link")).toHaveText(["data-reveal", "Overview", "Showcase", ...types.map((type) => type.id), "GitHub", "npm"]);
+    await expect(nav.getByRole("link", { name: "Showcase" })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "Showcase" }).locator('svg[data-icon="showcase"]')).toHaveCount(1);
   });
 
   test("lists each site with its screenshot and the types it uses", async ({ page }) => {
@@ -1405,7 +1409,10 @@ test.describe("showcase", () => {
     const usedTypes = first.getByRole("list", { name: "Types used" });
     for (const id of ["fade", "split", "batch", "counter"]) await expect(usedTypes.locator(`svg[data-icon="${id}"]`)).toHaveCount(1);
     await expect(cards.filter({ hasText: "Another example" }).locator("img")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Add your site" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add your site" })).toHaveAttribute(
+      "href",
+      /github\.com\/boccdotdev\/data-reveal\/issues\/new/,
+    );
     // The rest of the site works under that base path too.
     await page.getByRole("navigation", { name: "Site" }).getByRole("link", { name: "fade", exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute("data-example-state", "ready");
@@ -1423,18 +1430,5 @@ test.describe("icons", () => {
     }
     await openType(page, "/clip/");
     await expect(page.getByRole("heading", { level: 1 }).locator('svg[data-icon="clip"]')).toHaveCount(1);
-  });
-
-  test("the review page shows each icon at three sizes on light and dark", async ({ page }) => {
-    await page.goto("/icons/");
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex");
-    await expect(page.getByRole("navigation", { name: "Site" }).getByRole("link", { name: "Icons" })).toHaveCount(0);
-    const alternates = Object.values(icons).filter((set) => set.alternate).length;
-    for (const theme of ["light", "dark"]) {
-      const sheet = page.locator(`[data-icon-theme="${theme}"]`);
-      for (const size of [16, 20, 32]) {
-        await expect(sheet.locator(`svg[data-icon][width="${size}"]`)).toHaveCount(types.length + alternates);
-      }
-    }
   });
 });

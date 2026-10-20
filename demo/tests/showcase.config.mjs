@@ -1,4 +1,4 @@
-// The site built with one made-up showcase entry, for the tests: the real
+// The site built with two made-up showcase entries, for the tests: the real
 // list ships empty. Served at /showcase-fixture/ by tests/server.mjs.
 import { fileURLToPath } from "node:url";
 import config from "../astro.config.mjs";
@@ -13,7 +13,7 @@ export default {
     ...config.vite,
     resolve: {
       ...config.vite?.resolve,
-      alias: [{ find: /^\.\.\/data\/showcase$/, replacement: fixture }],
+      alias: [{ find: /^(\.\.\/)+data\/showcase$/, replacement: fixture }],
     },
   },
 };

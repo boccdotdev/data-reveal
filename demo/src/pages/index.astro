@@ -2,6 +2,7 @@
 import Site from "../layouts/Site.astro";
 import CodeBlock from "../components/CodeBlock.astro";
 import TypeIcon from "../components/TypeIcon.astro";
+import { showcase } from "../data/showcase";
 import { installSnippet } from "../lib/code";
 import { defaultEngine } from "../lib/engines";
 import { types } from "../lib/types";
@@ -25,7 +26,13 @@ const repo = "https://github.com/boccdotdev/data-reveal";
     <CodeBlock label="Install" lang="bash" code={installSnippet(defaultEngine)} />
     <p class="home-links mono">
       <a href={repo}>Source on GitHub</a>
-      <a href={`${base}showcase/`} data-nav>Sites built with it</a>
+      {
+        showcase.length > 0 && (
+          <a href={`${base}showcase/`} data-nav>
+            Sites built with it
+          </a>
+        )
+      }
     </p>
   </header>
 

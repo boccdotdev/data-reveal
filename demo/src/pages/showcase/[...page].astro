@@ -1,0 +1,18 @@
+---
+import Site from "../../layouts/Site.astro";
+import Showcase from "../../components/Showcase.astro";
+import { showcase } from "../../data/showcase";
+
+// Built only once the list has a site, so until then there's no /showcase/.
+export function getStaticPaths() {
+  return showcase.length > 0 ? [{ params: { page: undefined } }] : [];
+}
+---
+
+<Site title="Showcase · data-reveal" description="Sites built with data-reveal." current="showcase">
+  <header class="page-head">
+    <h1>Showcase</h1>
+    <p class="summary">Sites built with data-reveal.</p>
+  </header>
+  <Showcase entries={showcase} />
+</Site>

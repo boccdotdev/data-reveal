@@ -1,5 +1,6 @@
 ---
 import TypeIcon from "./TypeIcon.astro";
+import { showcase } from "../data/showcase";
 import { types } from "../lib/types";
 
 interface Props {
@@ -43,14 +44,18 @@ const at = (page: string) => (page === current ? "page" : undefined);
             <span class="nav-text">Overview</span>
           </a>
         </li>
-        <li>
-          <a href={`${base}showcase/`} aria-current={at("showcase")} data-nav>
-            <svg class="type-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" data-icon="showcase">
-              <path d="M3 4h14v12H3zM3 8h14" />
-            </svg>
-            <span class="nav-text">Showcase</span>
-          </a>
-        </li>
+        {
+          showcase.length > 0 && (
+            <li>
+              <a href={`${base}showcase/`} aria-current={at("showcase")} data-nav>
+                <svg class="type-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" data-icon="showcase">
+                  <path d="M3 4h14v12H3zM3 8h14" />
+                </svg>
+                <span class="nav-text">Showcase</span>
+              </a>
+            </li>
+          )
+        }
       </ul>
       <p class="nav-label mono" id="nav-types">Types</p>
       <ul class="nav-links mono" role="list" aria-labelledby="nav-types" translate="no">

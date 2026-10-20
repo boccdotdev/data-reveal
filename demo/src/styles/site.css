@@ -483,14 +483,12 @@
   .sound-toggle,
   .copy-button,
   .home-links a,
-  .showcase-add a,
-  .showcase-empty a {
+  .showcase-add a {
     min-block-size: 2.75rem;
   }
 
   .home-links a,
-  .showcase-add a,
-  .showcase-empty a {
+  .showcase-add a {
     display: inline-flex;
     align-items: center;
   }
@@ -744,7 +742,7 @@
   }
 }
 
-/* Page headings for the showcase and the icon sheet */
+/* Page headings for the showcase and the 404 page */
 
 .page-head {
   display: grid;
@@ -764,14 +762,6 @@
 
 /* Showcase */
 
-.showcase-empty {
-  display: grid;
-  gap: 1rem;
-  padding-block: 3rem;
-  border-block: 1px solid var(--rule);
-}
-
-.showcase-empty a,
 .showcase-add a {
   text-decoration: none;
 }
@@ -833,56 +823,6 @@
 
 .showcase-add {
   padding-block-start: 2rem;
-}
-
-/* The icon sheet */
-
-.icon-sheet {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-  gap: 2rem;
-}
-
-.icon-theme {
-  padding: 1.5rem;
-  border: 1px solid var(--rule);
-}
-
-.icon-theme-light {
-  background: var(--white);
-  color: var(--black);
-}
-
-.icon-theme-dark {
-  background: var(--black);
-  color: var(--white);
-}
-
-.icon-theme-label {
-  padding-block-end: 1rem;
-  opacity: 0.7;
-}
-
-.icon-rows {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.icon-row {
-  display: grid;
-  grid-template-columns: 6rem 1fr 1fr;
-  align-items: center;
-  gap: 1rem;
-  padding-block: 0.75rem;
-  border-block-start: 1px solid color-mix(in oklch, currentColor 20%, transparent);
-}
-
-.icon-sizes {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
 }
 
 /* Page changes: the content fades out, and the new page fades in as it
