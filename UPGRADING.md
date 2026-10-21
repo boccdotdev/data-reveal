@@ -116,7 +116,9 @@ workarounds 0.4 makes unnecessary. Work in small, reviewable steps.
      straight after it needs await reveal.refresh(). Leave a direct
      ScrollTrigger.refresh() where the site's own ScrollTriggers need
      refreshing at once.
-   - Remove (g); split's ARIA defaults and re-splitting cover it.
+   - Remove (g) where it's there for data-reveal's splits: split's ARIA
+     defaults and re-splitting cover it. Keep a SplitText wrapper, or a wait
+     for fonts, that the site's own code relies on too.
    - Remove a delay or flag in (i) only when it was there to stop a slow
      init() arming content that's gone. Keep delays that wait for layout:
      Barba, for one, keeps the old container until after afterEnter. Follow

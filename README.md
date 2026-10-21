@@ -549,21 +549,25 @@ Without these, an edited section's reveals stay hidden and its old triggers leak
 
 ### Astro view transitions
 
-With `<ClientRouter />`, the page is swapped on navigation, except for elements marked `transition:persist`, which carry over:
+With `<ClientRouter />`, the page is swapped on navigation. An element marked `transition:persist` carries over, with everything inside it, when the next page has one by the same name, and is thrown away with the old page when it doesn't:
 
 ```ts
 import { reveal } from "./reveal";
 
-document.addEventListener("astro:before-swap", () => {
+document.addEventListener("astro:before-swap", (event) => {
+  const attr = "data-astro-transition-persist";
+  const carried = [...document.querySelectorAll(`[${attr}]`)].filter((el) =>
+    event.newDocument.querySelector(`[${attr}="${el.getAttribute(attr)}"]`),
+  );
   for (const el of document.querySelectorAll("[data-reveal]")) {
-    // Persisted elements stay, and keep their reveals.
-    if (!el.closest("[data-astro-transition-persist]")) reveal.destroy(el, { revert: false });
+    // Elements that carry over keep their reveals.
+    if (!carried.some((kept) => kept.contains(el))) reveal.destroy(el, { revert: false });
   }
 });
 document.addEventListener("astro:after-swap", () => reveal.init());
 ```
 
-A bare `destroy()` would forget the persisted elements too, so they'd replay on every navigation. `astro:after-swap` fires as the new page goes in, before it's shown. `astro:page-load` comes once it's visible, too late for content already on screen. Astro runs a bundled script once per visit, not on each navigation, so the instance's first `init()` covers the page the visitor lands on and `astro:after-swap` covers every page after it. Your own code that binds to elements on the page still belongs in an `astro:page-load` listener.
+A bare `destroy()` would forget the elements that carry over too, so they'd replay on every navigation. Skipping every persisted element instead would leave the reveals of ones the next page doesn't have in memory for the rest of the visit. `astro:after-swap` fires as the new page goes in, before it's shown. `astro:page-load` comes once it's visible, too late for content already on screen. Astro runs a bundled script once per visit, not on each navigation, so the instance's first `init()` covers the page the visitor lands on and `astro:after-swap` covers every page after it. Your own code that binds to elements on the page still belongs in an `astro:page-load` listener.
 
 ### Lenis
 
