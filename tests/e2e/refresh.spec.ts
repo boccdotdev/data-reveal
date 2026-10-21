@@ -34,7 +34,10 @@ test.describe("a smooth scroll in progress", () => {
       card.className = "box";
       card.dataset.reveal = "fade";
       card.dataset.revealDuration = "0.2";
-      document.body.prepend(card);
+      // At the end, as a load-more adds it. Content added above the viewport
+      // shifts the page, and WebKit on Linux stops a smooth scroll for that
+      // with no reveal on the page at all.
+      document.body.append(card);
       void window.__reveal.instance?.init(card);
     });
     expect(Math.abs((await scrollSettled(page)) - target)).toBeLessThanOrEqual(20);
