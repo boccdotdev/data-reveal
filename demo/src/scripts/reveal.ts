@@ -1,7 +1,8 @@
 // The site's one reveal instance, on the engine this page runs. Across page
 // changes it follows the README's recipe for Astro view transitions: before
-// the swap, each reveal leaving the page is destroyed (persisted elements
-// keep theirs), and after it, init() takes on the new page.
+// the swap, each reveal leaving the page is destroyed (elements that carry
+// over to the next page keep theirs), and after it, init() takes on the new
+// page.
 //
 // A type whose chunk fails to load makes init() reject. The package has
 // already shown the element as written by then (`data-reveal-state="failed"`),
@@ -30,10 +31,14 @@ const instance = await create();
 
 if (instance) {
   const reveal = instance;
-  document.addEventListener("astro:before-swap", () => {
+  document.addEventListener("astro:before-swap", (event) => {
+    const attr = "data-astro-transition-persist";
+    const carried = [...document.querySelectorAll(`[${attr}]`)].filter((el) =>
+      event.newDocument.querySelector(`[${attr}="${el.getAttribute(attr)}"]`),
+    );
     for (const el of document.querySelectorAll("[data-reveal]")) {
-      // Persisted elements stay, and keep their reveals.
-      if (!el.closest("[data-astro-transition-persist]")) reveal.destroy(el, { revert: false });
+      // Elements that carry over keep their reveals.
+      if (!carried.some((kept) => kept.contains(el))) reveal.destroy(el, { revert: false });
     }
   });
   document.addEventListener("astro:after-swap", () => reveal.init().catch(logFailure));
