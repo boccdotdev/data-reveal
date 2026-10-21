@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 (2026-10-18)
+## 0.4.0 (2026-10-21)
 
 The HTML and the `createReveal()`, `init()`, `refresh()` and `destroy()` calls are unchanged, so most sites upgrade by bumping the version. [UPGRADING.md](./UPGRADING.md) lists the workarounds you can now delete, with a prompt for a coding agent, and what to check.
 
