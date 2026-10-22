@@ -1,0 +1,41 @@
+---
+// A labelled code block with a Copy button. Static code goes through
+// Astro's Shiki with the site's own theme; `live` blocks are filled and
+// coloured by the page script with the same colours.
+import { Code } from "astro:components";
+import { codeTheme } from "../lib/code";
+
+interface Props {
+  label: string;
+  lang: "html" | "css" | "js" | "bash";
+  code: string;
+  /** Pre-rendered HTML for a block the page script keeps up to date. */
+  live?: string;
+  /** The label's id, when the page has more than one block with this label. */
+  id?: string;
+}
+
+const { label, lang, code, live } = Astro.props;
+const id = Astro.props.id ?? `code-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+---
+
+<div class="code-block" data-code-block>
+  <div class="code-head mono">
+    <span class="label" id={id}>{label}</span>
+    {/* The button's own label says Copied or Failed for a moment. Its name
+        stays put, and this says what happened, once, to screen readers. */}
+    <span class="visually-hidden" role="status" data-copy-status></span>
+    <button type="button" class="text-button copy-button" aria-label={`Copy ${label}`} data-copy>
+      <span aria-hidden="true" data-copy-label>Copy</span>
+    </button>
+  </div>
+  <div role="region" aria-labelledby={id} translate="no">
+    {
+      live !== undefined ? (
+        <pre class="code" tabindex="0" data-language={lang}><code data-live-code set:html={live} /></pre>
+      ) : (
+        <Code code={code} lang={lang} theme={codeTheme} />
+      )
+    }
+  </div>
+</div>

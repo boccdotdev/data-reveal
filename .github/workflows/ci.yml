@@ -48,3 +48,28 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+
+  # The demo site takes the package from the root, so a change there can break its build.
+  demo:
+    name: Demo site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            demo/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+
+      - run: npm ci
+        working-directory: demo
+      - run: npm run check
+        working-directory: demo
+      - run: npm run build
+        working-directory: demo

@@ -1,0 +1,842 @@
+/* Every page: the nav, the page column, code blocks, the
+   home page's index and showcase, and the footer. Hairline rules and plenty
+   of room. */
+
+:root {
+  --gutter: clamp(1rem, 0.4rem + 2.5vw, 2rem);
+  --code-bg: #1e1e1e;
+  --code-fg: #e1e1e1;
+  /* Code blocks are dark in both themes; on the dark page a hairline marks them off. */
+  --code-border: light-dark(var(--code-bg), color-mix(in oklch, var(--grey-dark) 40%, var(--code-bg)));
+}
+
+.skip-link {
+  position: absolute;
+  inset-block-start: 0.5rem;
+  inset-inline-start: 0.5rem;
+  z-index: 20;
+  padding: 0.5rem 0.75rem;
+  background: var(--text);
+  color: var(--bg);
+  text-decoration: none;
+  translate: 0 calc(-100% - 1rem);
+}
+
+.skip-link:focus-visible {
+  translate: 0 0;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.label {
+  color: var(--muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  a:hover,
+  .text-button:hover,
+  .nav-buttons .bar-button:hover,
+  .sound-toggle:hover {
+    color: var(--hover);
+  }
+}
+
+:is(a, button):active {
+  opacity: 0.6;
+}
+
+/* The shell: the nav down the left of wide screens, which can be hidden,
+   and a bar with a menu on narrow ones. */
+
+.site {
+  display: grid;
+  min-block-size: 100svh;
+}
+
+.nav {
+  background: var(--bg);
+}
+
+.nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wordmark {
+  text-decoration: none;
+}
+
+.bar-button,
+.sound-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.sound-state {
+  color: var(--muted);
+}
+
+.nav-menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-links {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-links a {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding-block: 0.25rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.type-icon,
+.sound-glyph {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.nav-mark {
+  flex: none;
+  fill: currentColor;
+}
+
+/* GitHub and npm, at the bottom of the nav's box. */
+.nav-external {
+  margin-block-start: auto;
+  padding-block: 2rem 1.5rem;
+}
+
+.sound-toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.sound-toggle[aria-checked="false"] .sound-waves {
+  display: none;
+}
+
+.nav-links a[aria-current="page"] {
+  color: var(--text);
+}
+
+.nav-links a[aria-current="page"]::after {
+  content: "";
+  inline-size: 0.375rem;
+  block-size: 0.375rem;
+  background: currentColor;
+}
+
+.nav-label {
+  margin-block: 1.5rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.nav-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding-block-start: 2rem;
+  white-space: nowrap;
+}
+
+.nav-foot a {
+  text-decoration: none;
+}
+
+/* The bar above the page column, with the buttons that hide the panels. */
+
+:root {
+  /* The bar along the top of the column and the nav's wordmark row share a
+     height, so their rules make one line; the same goes for the bar along
+     the bottom and the nav's last row. */
+  --bar-height: 2.8125rem; /* 44px to tap, and the rule */
+  --foot-height: 3rem;
+}
+
+.panel-bar {
+  display: none;
+}
+
+.panel-glyph {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.panel-glyph-fill {
+  stroke: none;
+}
+
+[aria-expanded="true"] > .panel-glyph .panel-glyph-fill {
+  fill: currentColor;
+}
+
+@media (width >= 60rem) {
+  /* Three tracks: the nav, the page column and the settings. Folding the
+     nav or hiding the settings changes one track, and the one transition on
+     the grid moves every edge together. */
+  .site {
+    --nav-track: 14.5rem;
+    --settings-track: 0rem;
+    grid-template-columns: var(--nav-track) minmax(0, 1fr) var(--settings-track);
+  }
+
+  .site:has(> .settings-pane) {
+    --settings-track: 24.5rem;
+  }
+
+  :root[data-settings-hidden] .site {
+    --settings-track: 0rem;
+  }
+
+  .nav {
+    position: sticky;
+    inset-block-start: 0;
+    align-self: start;
+    block-size: 100dvh;
+    overflow: hidden;
+    border-inline-end: 1px solid var(--rule);
+  }
+
+  .nav-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    inline-size: 14.5rem;
+    block-size: 100%;
+    padding-inline: 1.75rem 1.5rem;
+    overflow-y: auto;
+  }
+
+  .nav-bar,
+  .nav-foot {
+    flex: none;
+    margin-inline: -1.75rem -1.5rem;
+    padding-inline: 1.75rem 1.5rem;
+  }
+
+  .nav-bar {
+    block-size: var(--bar-height);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .nav-buttons {
+    display: none;
+  }
+
+  .nav-menu {
+    flex: 1;
+  }
+
+  .nav-foot {
+    align-items: center;
+    block-size: var(--foot-height);
+    padding-block: 0;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .panel-bar {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 5;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    block-size: var(--bar-height);
+    margin-inline: -2.5rem -2rem;
+    padding-inline: 2.5rem 2rem;
+    border-block-end: 1px solid var(--rule);
+    background: var(--bg);
+  }
+
+  .panel-bar .bar-button {
+    color: var(--muted);
+  }
+
+  /* Folded, the nav is a rail of icons. Each name shows beside its icon on
+     hover and focus, over the page, so the rail mustn't clip. */
+
+  :root[data-nav-rail] .site {
+    --nav-track: 3rem;
+  }
+
+  :root[data-nav-rail] .nav {
+    z-index: 6;
+    overflow: visible;
+  }
+
+  :root[data-nav-rail] .nav-inner {
+    align-items: center;
+    gap: 1rem;
+    inline-size: 3rem;
+    padding: 0;
+    overflow: visible;
+  }
+
+  :root[data-nav-rail] :is(.nav-bar, .nav-foot) {
+    align-self: stretch;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  :root[data-nav-rail] .wordmark {
+    display: none;
+  }
+
+  :root[data-nav-rail] .nav-menu {
+    align-self: stretch;
+    align-items: center;
+  }
+
+  :root[data-nav-rail] .nav-links {
+    justify-items: center;
+    gap: 0.25rem;
+  }
+
+  :root[data-nav-rail] .nav-links a {
+    position: relative;
+    justify-content: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    padding: 0;
+  }
+
+  :root[data-nav-rail] .nav-links a[aria-current="page"] {
+    background: var(--text);
+    color: var(--bg);
+  }
+
+  :root[data-nav-rail] .nav-links a[aria-current="page"]::after {
+    content: none;
+  }
+
+  /* The "Types" label becomes a short rule between the two lists. */
+  :root[data-nav-rail] .nav-label {
+    inline-size: 1.25rem;
+    block-size: 1px;
+    margin-block: 0.75rem;
+    overflow: clip;
+    background: var(--rule);
+    color: transparent;
+  }
+
+  :root[data-nav-rail] .nav-text {
+    position: absolute;
+    inset-inline-start: calc(100% + 0.5rem);
+    inset-block-start: 50%;
+    z-index: 30;
+    padding: 0.25rem 0.5rem;
+    background: var(--text);
+    color: var(--bg);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    translate: 0 -50%;
+  }
+
+  :root[data-nav-rail] :is(a, button):is(:hover, :focus-visible) > .nav-text {
+    opacity: 1;
+  }
+
+  /* Escape dismisses the tooltip until another item is pointed at. */
+  :root[data-nav-rail][data-tips-hidden] :is(a, button) > .nav-text {
+    opacity: 0;
+  }
+
+  :root[data-nav-rail] .nav-foot {
+    justify-content: center;
+  }
+
+  :root[data-nav-rail] .sound-state {
+    display: none;
+  }
+
+
+
+  :root[data-nav-rail] .sound-toggle {
+    position: relative;
+    justify-content: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+  }
+
+  :root[data-nav-rail] .sound-toggle {
+    gap: 0;
+  }
+
+  :root[data-nav-rail] .nav-external {
+    padding-block: 1rem 0.75rem;
+  }
+
+
+
+  /* The settings: a full-height column like the nav. Its contents keep
+     their width and sit against the pane's left edge, border included, so
+     as the track shrinks they move off to the right and the pane clips
+     them. Closed, nothing of it is left. */
+  .settings-pane {
+    position: sticky;
+    inset-block-start: 0;
+    align-self: start;
+    block-size: 100dvh;
+    overflow: hidden;
+  }
+
+  .settings-inner {
+    inline-size: 24.5rem;
+    block-size: 100%;
+    padding: 2rem 2rem 2rem 2.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-inline-start: 1px solid var(--rule);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .site {
+      transition: grid-template-columns 250ms var(--ease-out);
+    }
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .panel-bar .bar-button:hover {
+    color: var(--text);
+  }
+}
+
+@media (width < 60rem) {
+  .nav {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 20;
+    padding-inline: var(--gutter);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .nav-bar {
+    min-block-size: 3.5rem;
+  }
+
+  .nav-buttons {
+    display: flex;
+    align-self: stretch;
+    gap: 1.5rem;
+  }
+
+  /* The nav stays from page to page, so its Settings button is always
+     there, and shows only where there are settings. */
+  :root:not(:has([data-settings-pane])) [data-settings-drawer] {
+    display: none;
+  }
+
+  .nav-menu:not([data-open]) {
+    display: none;
+  }
+
+  .nav-menu {
+    max-block-size: calc(100dvh - 3.5rem);
+    padding-block: 0.5rem 1.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .nav-links {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
+  }
+
+  /* 44px targets. */
+  .wordmark,
+  .nav-links a,
+  .sound-toggle,
+  .copy-button,
+  .home-links a,
+  .showcase-add a {
+    min-block-size: 2.75rem;
+  }
+
+  .home-links a,
+  .showcase-add a {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .wordmark {
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-buttons .bar-button {
+    justify-content: center;
+    min-inline-size: 2.75rem;
+  }
+
+  /* The settings are a drawer from the bottom. */
+  .settings-pane {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 10;
+    max-block-size: 70dvh;
+    padding: 1.5rem var(--gutter) calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-block-start: 1px solid var(--rule);
+    background: var(--bg);
+  }
+
+  :root:not([data-settings-open]) .settings-pane {
+    display: none;
+  }
+}
+
+/* Previous and next, along the bottom of a type page's column */
+
+.pager {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  block-size: var(--foot-height);
+  margin-inline: calc(-1 * var(--gutter));
+  padding-inline: var(--gutter);
+  border-block-start: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+.pager a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-block-size: 2.75rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+@media (width >= 60rem) {
+  .pager {
+    margin-inline: -2.5rem -2rem;
+    padding-inline: 2.5rem 2rem;
+  }
+}
+
+/* The page column */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  padding-inline: var(--gutter);
+}
+
+.content {
+  flex: 1;
+  padding-block-start: var(--gutter);
+}
+
+@media (width >= 60rem) {
+  .column {
+    padding-inline: 2.5rem 2rem;
+  }
+
+  .content {
+    padding-block-start: 2rem;
+  }
+}
+
+.motion-note {
+  display: none;
+  margin-block-start: 1rem;
+  padding-block-end: 1rem;
+  border-block-end: 1px solid var(--rule);
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-note {
+    display: block;
+  }
+}
+
+.content {
+  padding-block-end: 6rem;
+}
+
+/* Code blocks: dark in both themes, no wrapping, scrolled inside */
+
+.code-block {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.code-head {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.code-head .label {
+  margin-inline-end: auto;
+}
+
+/* Wide enough for Copied, so the label changes without a shift. */
+.copy-button {
+  display: inline-flex;
+  justify-content: flex-end;
+  inline-size: 6ch;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--code-border);
+  background-color: var(--code-bg) !important;
+  color: var(--code-fg);
+  color-scheme: dark;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.375rem;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.code-block pre code {
+  font: inherit;
+}
+
+/* The home page */
+
+.home-head {
+  display: grid;
+  gap: 1.5rem;
+  max-inline-size: 40rem;
+  padding-block-end: 5rem;
+}
+
+.home-head h1,
+.index h2 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.home-head a {
+  text-decoration: none;
+}
+
+.home-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+.intro code {
+  font-size: 0.875em;
+}
+
+.index h2 {
+  padding-block-end: 2rem;
+}
+
+.type-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-block-end: 1px solid var(--rule);
+}
+
+.type-row {
+  position: relative;
+  display: grid;
+  gap: 0.25rem 2rem;
+  padding-block: 1rem;
+}
+
+.type-row + .type-row {
+  border-block-start: 1px solid var(--rule);
+}
+
+.type-row-head {
+  display: none;
+  color: var(--muted);
+}
+
+.type-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+}
+
+/* The whole row is the link's target. */
+.type-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.type-link:focus-visible {
+  outline: 2px solid transparent;
+}
+
+.type-row:has(.type-link:focus-visible) {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.type-arrow {
+  display: none;
+  justify-self: end;
+  color: var(--muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .type-row:hover :is(.type-link, .type-arrow) {
+    color: var(--hover);
+  }
+}
+
+@media (width >= 48rem) {
+  .type-row {
+    grid-template-columns: 10rem minmax(0, 1fr) 3rem;
+  }
+
+  .type-row-head,
+  .type-arrow {
+    display: grid;
+  }
+}
+
+/* Page headings for the showcase and the 404 page */
+
+.page-head {
+  display: grid;
+  gap: 0.5rem;
+  max-inline-size: 40rem;
+  padding-block-end: 3rem;
+}
+
+.page-head h1 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.page-head .summary {
+  color: var(--muted);
+}
+
+/* Showcase */
+
+.showcase-add a {
+  text-decoration: none;
+}
+
+.showcase-grid {
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.showcase-card {
+  display: grid;
+  align-content: start;
+  border: 1px solid var(--rule);
+}
+
+.showcase-shot {
+  inline-size: 100%;
+  block-size: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  border-block-end: 1px solid var(--rule);
+  background-color: var(--raised);
+}
+
+.showcase-body {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem;
+}
+
+.showcase-name {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.showcase-name a {
+  text-decoration: none;
+}
+
+.showcase-host,
+.showcase-note {
+  color: var(--muted);
+}
+
+.showcase-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.5rem 0 0;
+  list-style: none;
+}
+
+.showcase-add {
+  padding-block-start: 2rem;
+}
+
+/* Page changes: the content fades out, and the new page fades in as it
+   rises a few pixels. */
+
+@keyframes demo-leave {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes demo-enter {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}

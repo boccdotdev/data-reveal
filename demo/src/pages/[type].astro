@@ -1,0 +1,131 @@
+---
+// One page per animation type, from the schema: the example or its code,
+// switched by tabs, with every setting beside them. The example runs in the
+// page itself, off the window's scroll, as it would on a real site.
+import { fade } from "astro:transitions";
+import "@boccdotdev/data-reveal/reveal.css";
+import "../styles/type-page.css";
+import Site from "../layouts/Site.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import Demo from "../components/Demo.astro";
+import Settings from "../components/Settings.astro";
+import TypeIcon from "../components/TypeIcon.astro";
+import { cssSnippet, highlightHtml, installSnippet, jsSnippet, runsToHtml } from "../lib/code";
+import { defaultEngine, engines } from "../lib/engines";
+import { htmlSnippet, initialValues } from "../lib/settings";
+import { types, type TypeSpec } from "../lib/types";
+
+export function getStaticPaths() {
+  return types.map((type, i) => ({
+    params: { type: type.id },
+    props: { type, previous: types[i - 1], next: types[i + 1] },
+  }));
+}
+
+interface Props {
+  type: TypeSpec;
+  previous?: TypeSpec;
+  next?: TypeSpec;
+}
+
+const { type, previous, next } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const html = htmlSnippet(type, initialValues(type), defaultEngine);
+---
+
+<Site title={`${type.label} · data-reveal`} description={type.summary} current={type.id} settings>
+  <article class="type-page" data-type-page={type.id}>
+    <header class="type-head">
+      <h1><TypeIcon type={type.id} size={24} /> {type.label}</h1>
+      <p class="summary">{type.summary}</p>
+    </header>
+
+    <div class="tabs-row mono">
+      <div class="tabs" role="tablist" aria-label="View">
+        <button type="button" role="tab" id="tab-example" aria-controls="panel-example" aria-selected="true" tabindex="0" data-tab="example">
+          Example
+        </button>
+        <button type="button" role="tab" id="tab-code" aria-controls="panel-code" aria-selected="false" tabindex="-1" data-tab="code">
+          Code
+        </button>
+      </div>
+    </div>
+
+    <div class="views">
+      <section class="example" role="tabpanel" id="panel-example" aria-labelledby="tab-example" tabindex="0" data-example>
+        <div class="example-tools">
+          <button type="button" class="replay mono" data-replay>Replay</button>
+        </div>
+        <div class="lead">
+          <p class="hint mono" aria-hidden="true">
+            Scroll to play
+            <svg class="hint-arrow" viewBox="0 0 20 20" width="20" height="20" focusable="false">
+              <path d="M10 3v13M5 11l5 5 5-5" />
+            </svg>
+          </p>
+        </div>
+        <div class="slot" data-slot><Demo type={type.id} /></div>
+        <div class="tail"></div>
+        <template data-demo><Demo type={type.id} /></template>
+      </section>
+
+      <section class="code" role="tabpanel" id="panel-code" aria-labelledby="tab-code" hidden data-code>
+        <CodeBlock label="HTML" lang="html" code={html} live={runsToHtml(highlightHtml(html))} />
+        <CodeBlock label="CSS" lang="css" code={cssSnippet} />
+        {
+          // The JS and the install line depend on the engine: the page shows the one it runs.
+          engines
+            .filter((engine) => engine.available)
+            .map((engine) => (
+              <div class="code-engine" data-engine-code={engine.id} hidden={engine.id !== defaultEngine.id}>
+                <CodeBlock label="JS" lang="js" code={jsSnippet(engine)} id={`code-js-${engine.id}`} />
+                <CodeBlock label="Install" lang="bash" code={installSnippet(engine)} id={`code-install-${engine.id}`} />
+              </div>
+            ))
+        }
+      </section>
+    </div>
+  </article>
+
+  <nav slot="pager" class="pager mono" aria-label="Previous and next type">
+    {
+      previous ? (
+        <a href={`${base}${previous.id}/`} rel="prev" data-nav>
+          <span aria-hidden="true">←</span>
+          <TypeIcon type={previous.id} size={16} />
+          <span class="visually-hidden">Previous: </span>
+          {previous.id}
+        </a>
+      ) : (
+        <span />
+      )
+    }
+    {
+      next && (
+        <a href={`${base}${next.id}/`} rel="next" data-nav>
+          <span class="visually-hidden">Next: </span>
+          {next.id}
+          <TypeIcon type={next.id} size={16} />
+          <span aria-hidden="true">→</span>
+        </a>
+      )
+    }
+  </nav>
+
+  <aside
+    slot="settings"
+    class="settings-pane"
+    id="settings-pane"
+    data-settings-pane
+    transition:name="settings"
+    transition:animate={fade({ duration: "200ms" })}
+  >
+    <div class="settings-inner">
+      <Settings type={type} />
+    </div>
+  </aside>
+
+  <script>
+    import "../scripts/type-page";
+  </script>
+</Site>

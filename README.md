@@ -614,6 +614,19 @@ npm run test:all         # both
 
 The unit tests in `tests/unit` cover the core and the registry with stand-in types, and every type against a GSAP stand-in. The package test builds and packs the package and checks what it ships. The end-to-end tests in `tests/e2e` load fixture pages from a small local server that can fail, delay or hold back any file, to act out a broken deploy or a slow network. GSAP comes from `node_modules`, so the tests don't need the internet. To run one browser, use `npx playwright test --project=chromium`. The fixture server listens on port 4791. Set `E2E_PORT` to run a second checkout's tests at the same time.
 
+### Demo site
+
+`demo/` is the playground: an Astro site with a page per animation type, every setting beside the example, and the code to copy. It takes the package from the repo root, so build the package first:
+
+```bash
+npm run build            # at the root
+cd demo
+npm ci
+npm run dev              # http://localhost:4321
+```
+
+It has its own Playwright tests and a Cloudflare deploy. [demo/README.md](./demo/README.md) has the details. The demo isn't part of the npm package.
+
 ## License
 
 [MIT](./LICENSE)

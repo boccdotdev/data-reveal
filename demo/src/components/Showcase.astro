@@ -1,0 +1,56 @@
+---
+import TypeIcon from "./TypeIcon.astro";
+import { types } from "../lib/types";
+import type { ShowcaseEntry } from "../data/showcase";
+
+interface Props {
+  entries: ShowcaseEntry[];
+}
+
+const { entries } = Astro.props;
+const sorted = [...entries].sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.name.localeCompare(b.name));
+const issue = "https://github.com/boccdotdev/data-reveal/issues/new?title=Showcase%3A%20";
+const host = (url: string) => new URL(url).host.replace(/^www\./, "");
+const label = (id: string) => types.find((type) => type.id === id)?.label ?? id;
+---
+
+<ul class="showcase-grid" role="list" data-showcase>
+  {
+    sorted.map((entry) => (
+      <li class="showcase-card">
+        {entry.image && (
+          <img
+            class="showcase-shot"
+            src={entry.image.src}
+            width={entry.image.width}
+            height={entry.image.height}
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+        )}
+        <div class="showcase-body">
+          <h2 class="showcase-name">
+            <a href={entry.url} rel="noopener" target="_blank">
+              {entry.name}
+              <span class="visually-hidden">, in a new tab</span>
+            </a>
+          </h2>
+          <p class="showcase-host mono">{host(entry.url)}</p>
+          {entry.note && <p class="showcase-note">{entry.note}</p>}
+          <ul class="showcase-types" role="list" aria-label="Types used">
+            {entry.types.map((type) => (
+              <li title={label(type)}>
+                <TypeIcon type={type} size={20} />
+                <span class="visually-hidden">{label(type)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </li>
+    ))
+  }
+</ul>
+<p class="showcase-add mono">
+  <a href={issue}>Add your site<span aria-hidden="true"> --&gt;</span></a>
+</p>

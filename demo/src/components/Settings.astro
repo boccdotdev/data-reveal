@@ -1,0 +1,122 @@
+---
+// Every setting for one type at once: the engine, the ease, then the type's
+// controls by group, drawn from the schema.
+import Control from "./Control.astro";
+import { cssEasing, curvePath, directions, families } from "../lib/eases";
+import { defaultEngine, engines } from "../lib/engines";
+import { easeValue, initialValues } from "../lib/settings";
+import type { TypeSpec } from "../lib/types";
+
+interface Props {
+  type: TypeSpec;
+}
+
+const { type } = Astro.props;
+const values = initialValues(type);
+const groups = [
+  ["timing", "Timing"],
+  ["options", "Options"],
+  ["trigger", "Trigger"],
+] as const;
+---
+
+<section class="settings" id="settings" aria-labelledby="settings-title" data-settings>
+  <h2 class="visually-hidden" id="settings-title">Settings</h2>
+
+  <div class="field" role="radiogroup" aria-labelledby="engine-label">
+    <span class="label mono" id="engine-label">Engine</span>
+    <div class="segmented">
+      {
+        engines.map((engine) => (
+          <label class="segment">
+            <input
+              type="radio"
+              name="engine"
+              value={engine.id}
+              checked={engine.id === defaultEngine.id}
+              disabled={!engine.available}
+              aria-disabled={engine.available ? undefined : "true"}
+              aria-describedby={engine.note ? `engine-note-${engine.id}` : undefined}
+            />
+            <span>{engine.label}</span>
+          </label>
+        ))
+      }
+    </div>
+    <p class="note mono">
+      {
+        engines
+          .filter((engine) => engine.note)
+          .map((engine) => (
+            <span id={`engine-note-${engine.id}`}>
+              {engine.label}: {engine.note?.toLowerCase()}.
+            </span>
+          ))
+      }
+    </p>
+  </div>
+
+  {
+    type.ease !== null && (
+      <div class="field">
+        <div class="field-head">
+          <span class="label mono" id="ease-label">
+            Ease
+          </span>
+          <code class="ease-name mono" data-ease-name>
+            {easeValue(type.ease, defaultEngine)} (built-in)
+          </code>
+        </div>
+        <div class="curves" role="radiogroup" aria-labelledby="ease-label">
+          <label class="curve">
+            <input type="radio" name="ease-family" value="builtin" data-ease={type.ease} checked />
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <path d={curvePath(cssEasing[type.ease] ?? "linear")} />
+            </svg>
+            <span class="mono">Built-in</span>
+          </label>
+          {families.map((family) => (
+            <label class="curve">
+              <input type="radio" name="ease-family" value={family.id} />
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <path
+                  d={curvePath(cssEasing[family.id === "none" ? "none" : `${family.id}.out`])}
+                  data-family-curve={family.id}
+                />
+              </svg>
+              <span class="mono">{family.label}</span>
+            </label>
+          ))}
+        </div>
+        <div class="segmented" role="radiogroup" aria-label="Ease direction">
+          {directions.map((direction) => (
+            <label class="segment">
+              <input type="radio" name="ease-direction" value={direction.id} checked={direction.id === "out"} disabled />
+              <span>{direction.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  {
+    groups.map(([group, title]) => {
+      const list = type.controls.filter((control) => control.group === group);
+      return (
+        list.length > 0 && (
+          <section class="group" aria-labelledby={`group-${group}`}>
+            <h3 class="label mono" id={`group-${group}`}>
+              {title}
+            </h3>
+            {list.map((control) => (
+              <Control control={control} value={values[control.key] ?? control.default} />
+            ))}
+          </section>
+        )
+      );
+    })
+  }
+
+  <button type="button" class="text-button mono reset" data-reset>Reset settings</button>
+</section>

@@ -1,0 +1,40 @@
+---
+// A type's icon, drawn inline in the text colour. Decorative: the type's
+// name always sits next to it.
+import type { RevealType } from "@boccdotdev/data-reveal";
+import { icons } from "../lib/icons";
+
+interface Props {
+  type: RevealType;
+  size?: number;
+  class?: string;
+}
+
+const { type, size = 20, class: className } = Astro.props;
+const parts = icons[type];
+---
+
+<svg
+  class:list={["type-icon", className]}
+  viewBox="0 0 20 20"
+  width={size}
+  height={size}
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.5"
+  stroke-linecap="square"
+  stroke-linejoin="miter"
+  aria-hidden="true"
+  focusable="false"
+  data-icon={type}
+>
+  {
+    parts.map((part) =>
+      part.filled ? (
+        <path d={part.d} fill="currentColor" stroke="none" />
+      ) : (
+        <path d={part.d} stroke-dasharray={part.dotted ? "0 3" : undefined} />
+      ),
+    )
+  }
+</svg>

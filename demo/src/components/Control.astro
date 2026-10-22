@@ -1,0 +1,95 @@
+---
+// One setting, drawn from its entry in the schema. The page script reads
+// and writes it through `data-key`.
+import type { Control } from "../lib/types";
+
+interface Props {
+  control: Control;
+  value: string;
+}
+
+const { control, value } = Astro.props;
+const id = `control-${control.key}`;
+const shown = `${value}${control.unit ?? ""}`;
+---
+
+{
+  control.kind === "segmented" && (
+    <div class="control" role="radiogroup" aria-labelledby={`${id}-label`}>
+      <span class="label" id={`${id}-label`}>{control.label}</span>
+      <div class="segmented">
+        {(control.choices ?? []).map((choice) => (
+          <label class="segment">
+            <input type="radio" name={id} value={choice.value} checked={choice.value === value} data-key={control.key} />
+            <span>{choice.label ?? choice.value}</span>
+          </label>
+        ))}
+      </div>
+      <small class="mono" data-engine-note hidden />
+    </div>
+  )
+}
+{
+  control.kind === "range" && (
+    <div class="control control-range">
+      <label class="label" for={id}>{control.label}</label>
+      <span class="mono" aria-hidden="true" data-output={control.key}>{shown}</span>
+      <input
+        type="range"
+        id={id}
+        name={control.key}
+        min={control.min}
+        max={control.max}
+        step={control.step}
+        value={value}
+        aria-valuetext={shown}
+        data-unit={control.unit ?? ""}
+        data-key={control.key}
+      />
+      <small class="mono" data-engine-note hidden />
+    </div>
+  )
+}
+{
+  control.kind === "select" && (
+    <div class="control">
+      <label class="label" for={id}>{control.label}</label>
+      <select id={id} name={control.key} data-key={control.key}>
+        {(control.choices ?? []).map((choice) => (
+          <option value={choice.value} selected={choice.value === value}>
+            {choice.label ?? choice.value}
+          </option>
+        ))}
+      </select>
+      <small class="mono" data-engine-note hidden />
+    </div>
+  )
+}
+{
+  control.kind === "text" && (
+    <div class="control">
+      <label class="label" for={id}>{control.label}</label>
+      <input
+        type="text"
+        id={id}
+        name={control.key}
+        value={value}
+        inputmode={control.inputMode}
+        placeholder={control.placeholder}
+        spellcheck="false"
+        autocomplete="off"
+        data-key={control.key}
+      />
+      <small class="mono" data-engine-note hidden />
+    </div>
+  )
+}
+{
+  control.kind === "toggle" && (
+    <div class="control">
+      <label class="label" for={id}>{control.label}</label>
+      <input type="checkbox" role="switch" id={id} name={control.key} checked={value === "true"} data-key={control.key} />
+      <small class="mono" data-engine-note hidden />
+    </div>
+  )
+}
