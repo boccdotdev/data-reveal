@@ -1,6 +1,6 @@
 {
   "name": "@boccdotdev/data-reveal",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Declarative, scroll-triggered reveal animations driven by data attributes. GSAP-powered, code-split so each animation type loads only when present on the page.",
   "type": "module",
   "exports": {
@@ -12,6 +12,7 @@
       "types": "./dist/manual.d.ts",
       "import": "./dist/manual.js"
     },
+    "./reveal.css": "./reveal.css",
     "./batch": {
       "types": "./dist/types/batch.d.ts",
       "import": "./dist/types/batch.js"
@@ -54,13 +55,21 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "reveal.css",
+    "CHANGELOG.md",
+    "UPGRADING.md"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:e2e": "npm run build && playwright test",
+    "test:all": "npm test && npm run test:e2e",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -84,8 +93,14 @@
     "gsap": ">=3.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.20.5",
     "gsap": "^3.13.0",
+    "happy-dom": "^21.0.3",
+    "postcss": "^8.5.30",
+    "postcss-import": "^17.0.1",
     "tsup": "^8.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^5.0.5"
   }
 }

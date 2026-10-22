@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Opacity</title>
+</head>
+<body>
+  <div id="counter" class="box muted" data-reveal="counter" data-reveal-duration="0.2">100</div>
+  <div id="parallax" class="box muted" data-reveal="parallax">parallax</div>
+  <div id="clip" class="box muted" data-reveal="clip" data-reveal-duration="0.2">clip</div>
+  <h2 id="split" class="muted" data-reveal="split" data-reveal-duration="0.2" data-reveal-stagger="0">Split heading</h2>
+  <ul id="batch" class="muted" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li>one</li>
+    <li>two</li>
+  </ul>
+  <div id="counter-transition" class="box muted fades" data-reveal="counter" data-reveal-duration="0.2">5</div>
+  <div id="counter-animated" class="box muted rises" data-reveal="counter" data-reveal-duration="0.2">7</div>
+  <div id="skipped" class="box" data-reveal="nope">skipped</div>
+  <div id="skipped-transition" class="box fades" data-reveal="nope">skipped, with a transition</div>
+  <div id="failed" class="box" data-reveal="blur" data-reveal-duration="0.2">blur</div>
+  <!-- A site's own pre-hide, written inline. -->
+  <div id="inline-hidden" class="box" data-reveal="counter" data-reveal-duration="0.2" style="opacity: 0">9</div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

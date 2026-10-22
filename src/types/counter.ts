@@ -1,21 +1,30 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
-import { num } from "../internal/attrs.js";
-import { revealTrigger } from "../internal/trigger.js";
+import { unhide } from "../core/visibility.js";
+import { printsAtEnd, revealed, revealedAtOnce } from "../internal/finish.js";
+import { option, options } from "../internal/options.js";
+import { isReverse, revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
-export const init: RevealInit = (el, { reduced }) => {
-  const raw = el.dataset.revealTo ?? el.textContent ?? "0";
-  const to = parseFloat(raw.replace(/[^0-9.\-]/g, "")) || 0;
-  const from = num(el.dataset.revealFrom, 0);
-  const duration = num(el.dataset.revealDuration, 1.5);
-  const decimals = num(el.dataset.revealDecimals, 0);
-  const separator = el.dataset.revealSeparator;
-  const prefix = el.dataset.revealPrefix ?? "";
-  const suffix = el.dataset.revealSuffix ?? "";
+// The number in a piece of text, ignoring formatting such as separators.
+const amount = (text: string): number => parseFloat(text.replace(/[^0-9.\-]/g, "")) || 0;
+
+export const init: RevealInit = (el, ctx) => {
+  const text = el.textContent ?? "";
+  // Without a `to`, count up to the number the element already shows.
+  const to = option(el, ctx, "to") ?? amount(text);
+  const { from, duration, decimals, separator, prefix, suffix, ease } = options(el, ctx, {
+    from: 0,
+    duration: 1.5,
+    decimals: 0,
+    separator: "",
+    prefix: "",
+    suffix: "",
+    ease: "power1.out",
+  });
 
   const format = (value: number): string => {
     const fixed = value.toFixed(decimals);
@@ -25,8 +34,17 @@ export const init: RevealInit = (el, { reduced }) => {
     return `${prefix}${decPart ? `${grouped}.${decPart}` : grouped}${suffix}`;
   };
 
-  if (reduced) {
+  // destroy() leaves the number counted to: the element's own text if that
+  // already shows it, in its own formatting, or else the formatted target,
+  // rather than a placeholder like "0".
+  registry.snapshot(el, el, { text: amount(text) === to ? text : format(to) });
+
+  // The count is the animation, so the element itself shows straight away.
+  unhide(el);
+
+  if (ctx.reduced) {
     el.textContent = format(to);
+    revealedAtOnce(el, ctx);
     return;
   }
 
@@ -36,14 +54,19 @@ export const init: RevealInit = (el, { reduced }) => {
   const tween = gsap.to(counter, {
     value: to,
     duration,
-    ease: "power1.out",
+    ease,
     onUpdate: () => {
       el.textContent = format(counter.value);
     },
-    scrollTrigger: revealTrigger(el),
+    // The text it ends on is the text destroy() would leave, so a finished
+    // count has nothing to undo.
+    onComplete: isReverse(el, ctx) ? undefined : () => revealed(el, { release: true }),
+    scrollTrigger: revealTrigger(el, ctx),
   });
 
   registry.track(el, tween);
+  // Printing shows the number it counts to.
+  printsAtEnd(el, ctx, () => tween);
 };
 
 export const counter: RevealRegistration = { type: "counter", init };

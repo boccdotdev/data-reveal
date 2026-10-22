@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Finished reveals</title>
+  <style>
+    .dim:hover { opacity: 0.5; }
+    #fixed { position: fixed; top: 0; left: 0; width: 20px; height: 20px; background: #c00; }
+  </style>
+</head>
+<body>
+  <p>Reveals a screen apart, to check what each leaves behind once it finishes.</p>
+  <div class="gap"></div>
+  <div id="scale" class="box" data-reveal="scale" data-reveal-duration="0.2">
+    scale, with a fixed child
+    <div id="fixed"></div>
+  </div>
+  <div class="gap"></div>
+  <div id="dim" class="box dim" data-reveal="fade" data-reveal-duration="0.2">fade, dims on hover</div>
+  <div class="gap"></div>
+  <!-- Each next to a twin that finishes normally, revealed at the same moment. -->
+  <div class="row">
+    <div id="keep" class="box" data-reveal="fade" data-reveal-duration="0.2" data-reveal-keep>fade, keeps its end state</div>
+    <div id="keep-twin" class="box" data-reveal="fade" data-reveal-duration="0.2">fade</div>
+  </div>
+  <div class="gap"></div>
+  <div class="row">
+    <div id="reverse" class="box" data-reveal="fade" data-reveal-duration="0.2" data-reveal-reverse>fade, plays in reverse</div>
+    <div id="reverse-twin" class="box" data-reveal="fade" data-reveal-duration="0.2">fade</div>
+  </div>
+  <div class="gap"></div>
+  <div id="counter" class="box" data-reveal="counter" data-reveal-duration="0.2" data-reveal-separator=",">1,200</div>
+  <div class="gap"></div>
+  <!-- As in the README: a placeholder 0 that counts up to data-reveal-to. -->
+  <div id="counter-to" class="box" data-reveal="counter" data-reveal-duration="0.2" data-reveal-to="1200" data-reveal-separator=",">0</div>
+  <div class="gap"></div>
+  <div id="muted" class="box muted" data-reveal="fade" data-reveal-duration="0.2">fade, muted</div>
+  <div class="gap"></div>
+  <div id="styled" class="box" data-reveal="fade" data-reveal-duration="0.2">fade, restyled by the site</div>
+  <div class="gap"></div>
+  <div id="site-tween" class="box" data-reveal="fade" data-reveal-duration="0.2">fade, with a tween of the site's own</div>
+  <div class="gap"></div>
+  <div id="spun" class="box" data-reveal="fade" data-reveal-duration="0.2">fade, turned by the site with GSAP</div>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

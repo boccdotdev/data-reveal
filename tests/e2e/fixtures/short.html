@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Short page</title>
+  <style>
+    body { padding: 0; }
+    /* Puts the row inside the bottom 15% of a 720px viewport, on a page too
+       short to scroll. */
+    .above { height: 625px; }
+  </style>
+</head>
+<body>
+  <div class="above"></div>
+  <div class="row">
+    <div id="fade" class="box" data-reveal="fade" data-reveal-duration="0.2">fade</div>
+    <ul id="batch" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+      <li data-reveal-item>batch</li>
+    </ul>
+  </div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

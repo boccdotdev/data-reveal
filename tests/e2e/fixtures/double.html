@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Two reveals on one element</title>
+</head>
+<body>
+  <p>A batch item that is also a fade of its own.</p>
+  <div class="gap"></div>
+  <ul id="list" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li id="both" data-reveal-item data-reveal="fade" data-reveal-duration="0.2">batch item and fade</li>
+    <li id="plain" data-reveal-item>batch item</li>
+    <!-- A slow fade, so a test can catch it mid-reveal. -->
+    <li id="late" data-reveal-item data-reveal="fade" data-reveal-duration="3">batch item and slow fade</li>
+    <!-- Opacity 0.6 of their own. The first one's fade starts before the batch does, the second one's after. -->
+    <li id="muted" class="muted" data-reveal-item data-reveal="fade" data-reveal-duration="0.2" data-reveal-start="top bottom">batch item and fade, starting first</li>
+    <li id="muted-later" class="muted" data-reveal-item data-reveal="fade" data-reveal-duration="0.2" data-reveal-start="top 30%">batch item and fade, starting second</li>
+    <!-- Its fade starts first and slowly, so the site can stop it partway. -->
+    <li id="killed" data-reveal-item data-reveal="fade" data-reveal-duration="3" data-reveal-start="top bottom">batch item and slow fade, stopped by the site</li>
+  </ul>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

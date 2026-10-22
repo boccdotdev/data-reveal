@@ -1,0 +1,11 @@
+{
+  // Type-checks the tests and tool configs. `src` stays on the base config,
+  // which has no Node types, so library code can't reach for them.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["node"],
+    "declaration": false
+  },
+  "include": ["src", "tests", "*.config.ts"]
+}

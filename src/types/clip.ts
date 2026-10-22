@@ -1,7 +1,9 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
-import { num } from "../internal/attrs.js";
+import { unhide } from "../core/visibility.js";
+import { markPending, printsAtEnd, revealCallbacks, revealedAtOnce } from "../internal/finish.js";
+import { options } from "../internal/options.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
@@ -16,27 +18,37 @@ const fromClip: Record<Direction, string> = {
   up: "inset(100% 0 0 0)",
 };
 
-export const init: RevealInit = (el, { reduced }) => {
-  if (reduced) {
-    gsap.set(el, { clipPath: "inset(0 0 0 0)", opacity: 1 });
+export const init: RevealInit = (el, ctx) => {
+  if (ctx.reduced) {
+    unhide(el);
+    revealedAtOnce(el, ctx);
     return;
   }
 
-  const direction = (el.dataset.revealDirection ?? "up") as Direction;
-  const duration = num(el.dataset.revealDuration, 0.7);
-  const delay = num(el.dataset.revealDelay, 0);
+  const { direction, duration, delay, ease } = options(el, ctx, {
+    direction: "up",
+    duration: 0.7,
+    delay: 0,
+    ease: "power3.out",
+  });
 
-  gsap.set(el, { clipPath: fromClip[direction] ?? fromClip.up, opacity: 1 });
+  gsap.set(el, { clipPath: fromClip[direction] ?? fromClip.up });
+  unhide(el);
 
+  markPending(el);
   const tween = gsap.to(el, {
     clipPath: "inset(0 0 0 0)",
     duration,
     delay,
-    ease: "power3.out",
-    scrollTrigger: revealTrigger(el),
+    ease,
+    scrollTrigger: revealTrigger(el, ctx),
+    // It leaves opacity alone, so another reveal hiding the element can't
+    // wait for it to show it.
+    ...revealCallbacks(el, ctx, { handsBack: false }),
   });
 
   registry.track(el, tween);
+  printsAtEnd(el, ctx, () => tween);
 };
 
 export const clip: RevealRegistration = { type: "clip", init };

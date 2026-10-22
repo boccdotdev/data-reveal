@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Batch items without a box</title>
+  <style>
+    ul { margin: 0; padding: 0; list-style: none; }
+    li { height: 32px; margin: 0 0 4px; background: #ddd; }
+    .later { display: none; }
+    /* Hidden below a breakpoint. */
+    @media (max-width: 799px) { .wide-only { display: none; } }
+    /* A carousel track before its script has sized it. */
+    .track { width: 0; height: 0; overflow: hidden; }
+    .track li { width: 100%; }
+    .tall { height: 2000px; }
+  </style>
+</head>
+<body>
+  <!-- A track with no size yet, in view; the test sizes it and moves it down. -->
+  <div id="carousel">
+    <ul id="track" class="track" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+      <li>slide one</li>
+      <li>slide two</li>
+    </ul>
+  </div>
+  <!-- Hidden at init; the test shows it. -->
+  <section id="section" class="later">
+    <div class="gap"></div>
+    <ul id="in-hidden" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+      <li>one</li>
+      <li>two</li>
+    </ul>
+  </section>
+  <div class="gap"></div>
+  <ul id="responsive" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li data-reveal-item>shown at every width</li>
+    <li id="wide-only" class="wide-only" data-reveal-item>shown from 800px</li>
+  </ul>
+  <div class="gap"></div>
+  <ul id="drops" data-reveal="batch" data-reveal-duration="0.2" data-reveal-stagger="0">
+    <li data-reveal-item>shown</li>
+    <li id="gone" data-reveal-item style="display: none">never shown, then taken out</li>
+  </ul>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

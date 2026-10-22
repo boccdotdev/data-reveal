@@ -1,7 +1,11 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
-import { num } from "../internal/attrs.js";
+import { shownOpacity, unhide } from "../core/visibility.js";
+import { markPending, printsAtEnd, revealCallbacks, revealedAtOnce } from "../internal/finish.js";
+import { capOpacity } from "../internal/opacity.js";
+import { options } from "../internal/options.js";
+import { ownTransform } from "../internal/transform.js";
 import { revealTrigger } from "../internal/trigger.js";
 import type { RevealInit, Direction, RevealRegistration } from "../internal/types.js";
 
@@ -15,34 +19,44 @@ const directionMap: Record<Direction, { xPercent?: number; yPercent?: number }> 
   right: { xPercent: -100 },
 };
 
-export const init: RevealInit = (el, { reduced }) => {
-  if (reduced) {
-    gsap.set(el, { opacity: 1, xPercent: 0, yPercent: 0 });
+export const init: RevealInit = (el, ctx) => {
+  if (ctx.reduced) {
+    unhide(el);
+    revealedAtOnce(el, ctx);
     return;
   }
 
-  const direction = (el.dataset.revealDirection ?? "up") as Direction;
-  const duration = num(el.dataset.revealDuration, 0.6);
-  const delay = num(el.dataset.revealDelay, 0);
+  const { direction, duration, delay, ease } = options(el, ctx, {
+    direction: "up",
+    duration: 0.6,
+    delay: 0,
+    ease: "power3.out",
+  });
 
+  const opacity = shownOpacity(el);
+  const own = ownTransform(el);
   const dir = directionMap[direction] ?? directionMap.up;
   gsap.set(el, {
     opacity: 0,
-    xPercent: dir.xPercent ?? 0,
-    yPercent: dir.yPercent ?? 0,
+    xPercent: own.xPercent + (dir.xPercent ?? 0),
+    yPercent: own.yPercent + (dir.yPercent ?? 0),
   });
 
+  markPending(el);
   const tween = gsap.to(el, {
-    opacity: 1,
-    xPercent: 0,
-    yPercent: 0,
+    opacity,
+    modifiers: capOpacity(opacity),
+    xPercent: own.xPercent,
+    yPercent: own.yPercent,
     duration,
     delay,
-    ease: "power3.out",
-    scrollTrigger: revealTrigger(el),
+    ease,
+    scrollTrigger: revealTrigger(el, ctx),
+    ...revealCallbacks(el, ctx),
   });
 
   registry.track(el, tween);
+  printsAtEnd(el, ctx, () => tween);
 };
 
 export const slide: RevealRegistration = { type: "slide", init };

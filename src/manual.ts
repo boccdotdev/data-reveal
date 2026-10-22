@@ -1,8 +1,8 @@
 import { createRevealCore } from "./core/createRevealCore.js";
 import type { RevealInstance } from "./core/createRevealCore.js";
-import type { RevealRegistration, RevealInit } from "./internal/types.js";
+import type { RevealDefaults, RevealRegistration, RevealInit } from "./internal/types.js";
 
-export interface CreateRevealOptions {
+export interface CreateRevealOptions extends RevealDefaults {
   /**
    * The reveal types to enable, each imported from its own subpath (e.g.
    * `import { fade } from "@boccdotdev/data-reveal/fade"`). Only the types you
@@ -21,18 +21,25 @@ export interface CreateRevealOptions {
  * import { fade } from "@boccdotdev/data-reveal/fade";
  * import { scale } from "@boccdotdev/data-reveal/scale";
  *
- * createReveal({ types: [fade, scale] }).init();
+ * createReveal({ types: [fade, scale], defaults: { duration: 0.35 } }).init();
  * ```
  */
-export function createReveal({ types }: CreateRevealOptions): RevealInstance {
+export function createReveal({ types, defaults, typeDefaults }: CreateRevealOptions): RevealInstance {
   const map = new Map<string, RevealInit>(types.map((t) => [t.type, t.init]));
-  return createRevealCore((type) => map.get(type) ?? null);
+  return createRevealCore((type) => map.get(type) ?? null, { defaults, typeDefaults });
 }
 
-export type { RevealInstance } from "./core/createRevealCore.js";
+export type { RevealInstance, RevealDestroyOptions } from "./core/createRevealCore.js";
 export type {
   RevealRegistration,
   RevealType,
   RevealContext,
   RevealInit,
+  RevealOptions,
+  RevealTypeDefaults,
+  RevealDefaults,
+  Direction,
+  Axis,
+  SplitType,
+  SplitAria,
 } from "./internal/types.js";

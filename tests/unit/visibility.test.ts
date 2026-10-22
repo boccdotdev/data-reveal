@@ -1,0 +1,93 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { unhide } from "../../src/core/visibility";
+import { el, html, loadCore } from "./helpers";
+
+beforeEach(() => {
+  document.head.innerHTML = `<style>.hidden { opacity: 0; } .muted { opacity: 0.6; }</style>`;
+  document.body.innerHTML = "";
+});
+
+// Stands in for the CSSTransition a browser starts when `reveal.css` lets go
+// of an element with `transition: opacity`.
+function transitioning(target: HTMLElement, from: string, to: string): void {
+  const transition = {
+    transitionProperty: "opacity",
+    effect: { getKeyframes: () => [{ opacity: from }, { opacity: to }] },
+  };
+  target.getAnimations = () => [transition as unknown as Animation];
+}
+
+// Stands in for a CSS animation of the site's own on the element.
+function animating(target: HTMLElement, frames: Keyframe[]): void {
+  const animation = { animationName: "site", effect: { getKeyframes: () => frames } };
+  target.getAnimations = () => [animation as unknown as Animation];
+}
+
+describe("unhide()", () => {
+  it("shows an element that computes to opacity 0", () => {
+    html(`<div id="a" class="hidden"></div>`);
+    unhide(el("a"));
+    expect(el("a").style.opacity).toBe("1");
+  });
+
+  it("leaves any other opacity alone", () => {
+    html(`<div id="a" class="muted"></div><div id="b"></div>`);
+    unhide(el("a"));
+    unhide(el("b"));
+    expect(el("a").style.opacity).toBe("");
+    expect(el("b").style.opacity).toBe("");
+  });
+
+  it("goes by where a running opacity transition ends, not where it starts", () => {
+    html(`<div id="muted" class="hidden"></div><div id="hidden" class="hidden"></div>`);
+    // Both compute to 0 right now, at the start of their transitions.
+    transitioning(el("muted"), "0", "0.6");
+    transitioning(el("hidden"), "0.6", "0");
+
+    unhide(el("muted"));
+    unhide(el("hidden"));
+    expect(el("muted").style.opacity).toBe("");
+    expect(el("hidden").style.opacity).toBe("1");
+  });
+
+  it("leaves an element alone while a site's own animation drives its opacity", () => {
+    html(`<div id="a" class="hidden"></div>`);
+    animating(el("a"), [{ opacity: "0" }, { opacity: "0.6" }]);
+
+    unhide(el("a"));
+    expect(el("a").style.opacity).toBe("");
+  });
+
+  it("ignores animations that don't touch opacity", () => {
+    html(`<div id="a" class="hidden"></div>`);
+    animating(el("a"), [{ transform: "translateY(20px)" }, { transform: "none" }]);
+
+    unhide(el("a"));
+    expect(el("a").style.opacity).toBe("1");
+  });
+});
+
+describe("shownOpacity()", () => {
+  it("reads an element another reveal has hidden as its snapshot recorded it, and leaves it hidden", async () => {
+    const { registry } = await loadCore();
+    const { shownOpacity } = await import("../../src/core/visibility");
+    html(`<ul id="list"><li id="item" class="muted"></li></ul>`);
+    // The batch armed first and hid its item; now the item's own fade arms.
+    registry.snapshot(el("list"), el("item"));
+    el("item").style.opacity = "0";
+    registry.snapshot(el("item"), el("item"));
+
+    expect(shownOpacity(el("item"))).toBe(0.6);
+    expect(el("item").style.opacity).toBe("0");
+  });
+
+  it("reads a reveal element reveal.css is still hiding as its own CSS has it", async () => {
+    await loadCore();
+    const { shownOpacity } = await import("../../src/core/visibility");
+    document.head.innerHTML += `<style>[data-reveal]:not([data-reveal-state]) { opacity: 0; }</style>`;
+    html(`<ul><li id="item" class="muted" data-reveal="fade"></li></ul>`);
+
+    expect(shownOpacity(el("item"))).toBe(0.6);
+    expect(el("item").hasAttribute("data-reveal-state")).toBe(false);
+  });
+});

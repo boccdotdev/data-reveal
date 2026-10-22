@@ -1,0 +1,130 @@
+// Static server for the end-to-end fixtures, with fault injection. No
+// dependencies, so it runs anywhere Node does.
+//
+//   /<faults>/fixtures/<page>.html   a fixture page
+//   /<faults>/dist/...               the built package (run `npm run build`)
+//   /<faults>/dist-copy/...          the same files at another URL, which the
+//                                    browser loads as a second copy, as it
+//                                    would a separately bundled script
+//   /<faults>/reveal.css             the stylesheet
+//   /<faults>/gsap/...               node_modules/gsap
+//   /<faults>/font/late.ttf          a font file, for fixtures that need one
+//                                    to finish loading late (delay=late:<ms>)
+//
+// <faults> is "-" for none, or a comma-separated list of `fail=<name>`,
+// `delay=<name>:<ms>` and `hang=<name>`. A fault applies to every file whose
+// name without its extension is <name>: "fade" matches dist/types/fade.js,
+// "ScrollTrigger" matches gsap/ScrollTrigger.js. Fixture pages build these
+// URLs with relative paths, so the faults carry over to everything they load.
+import { readdirSync, realpathSync } from "node:fs";
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { basename, extname, join, normalize, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = realpathSync(fileURLToPath(new URL("../..", import.meta.url)));
+const port = Number(process.env.PORT ?? 4791);
+
+const mounts = {
+  fixtures: join(root, "tests/e2e/fixtures"),
+  dist: join(root, "dist"),
+  "dist-copy": join(root, "dist"),
+  gsap: join(root, "node_modules/gsap"),
+};
+
+const contentTypes = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".ttf": "font/ttf",
+};
+
+// Any font will do: Playwright ships one (its icon font) in node_modules, so
+// the fixtures don't need a font file of their own.
+function findFont(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const found = findFont(path);
+      if (found) return found;
+    } else if (entry.name.endsWith(".ttf")) {
+      return path;
+    }
+  }
+  return null;
+}
+const font = findFont(join(root, "node_modules/playwright-core/lib"));
+
+function parseFaults(segment) {
+  const faults = { fail: new Set(), hang: new Set(), delay: new Map() };
+  if (segment === "-") return faults;
+  for (const entry of decodeURIComponent(segment).split(",")) {
+    const [kind, value = ""] = entry.split("=");
+    if (kind === "fail" || kind === "hang") faults[kind].add(value);
+    else if (kind === "delay") {
+      const [name, ms] = value.split(":");
+      faults.delay.set(name, Number(ms));
+    } else throw new Error(`Unknown fault "${entry}"`);
+  }
+  return faults;
+}
+
+function resolveFile(path) {
+  if (path === "reveal.css") return join(root, "reveal.css");
+  if (path === "font/late.ttf") return font;
+  const [mount, ...rest] = path.split("/");
+  const base = mounts[mount];
+  if (!base) return null;
+  const file = normalize(join(base, ...rest));
+  // Keep requests inside their mount.
+  return file.startsWith(base + sep) ? file : null;
+}
+
+const server = createServer(async (req, res) => {
+  const { pathname, searchParams } = new URL(req.url ?? "/", "http://localhost");
+  if (pathname === "/health") {
+    // Playwright passes its own checkout's root, so a server another checkout
+    // left on this port answers 409 instead of being silently reused.
+    const expected = searchParams.get("root");
+    res.writeHead(expected === null || expected === root ? 200 : 409).end(root);
+    return;
+  }
+
+  const match = pathname.match(/^\/([^/]+)\/(.+)$/);
+  let faults;
+  try {
+    faults = match && parseFaults(match[1]);
+  } catch (error) {
+    res.writeHead(400).end(String(error));
+    return;
+  }
+  const file = match && resolveFile(match[2]);
+  if (!faults || !file) {
+    res.writeHead(404).end("not found");
+    return;
+  }
+
+  const name = basename(match[2], extname(match[2]));
+  if (faults.hang.has(name)) return; // never answer
+  const delay = faults.delay.get(name);
+  if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+  if (faults.fail.has(name)) {
+    res.writeHead(404).end("failed on purpose");
+    return;
+  }
+
+  try {
+    const body = await readFile(file);
+    res.writeHead(200, {
+      "content-type": contentTypes[extname(file)] ?? "application/octet-stream",
+      "cache-control": "no-store",
+    });
+    res.end(body);
+  } catch {
+    res.writeHead(404).end("not found");
+  }
+});
+
+server.listen(port, "127.0.0.1", () => {
+  console.log(`fixtures on http://127.0.0.1:${port}`);
+});

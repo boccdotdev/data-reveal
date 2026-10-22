@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Two copies of the package</title>
+  <style>
+    /* Each reveal sits next to a twin with the same CSS and no reveal, which
+       shows where it should end up. */
+    .stage { position: relative; width: 400px; height: 60px; }
+    .stage > * { width: 200px; height: 40px; margin: 0; box-sizing: border-box; }
+    .raised { translate: 0 -10px; }
+    .twin { visibility: hidden; }
+  </style>
+</head>
+<body>
+  <p>Two separately bundled scripts, each with fade, each calling init() on the whole page.</p>
+  <div class="stage"><div id="top" class="box muted raised" data-reveal="fade" data-reveal-duration="0.4">fade, in view</div></div>
+  <div class="stage"><div id="top-twin" class="box muted raised twin">twin</div></div>
+  <div class="gap"></div>
+  <div class="stage"><div id="below" class="box muted raised" data-reveal="fade" data-reveal-duration="0.4">fade, below the fold</div></div>
+  <div class="stage"><div id="below-twin" class="box muted raised twin">twin</div></div>
+  <div class="gap"></div>
+  <div class="stage"><div id="plain" class="box" data-reveal="fade" data-reveal-duration="0.4">fade, no transform of its own</div></div>
+  <div class="stage"><div id="plain-twin" class="box twin">twin</div></div>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

@@ -1,48 +1,66 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { registry } from "../core/registry.js";
-import { num } from "../internal/attrs.js";
+import { shownOpacity, unhide } from "../core/visibility.js";
+import { markPending, printsAtEnd, revealCallbacks, revealedAtOnce } from "../internal/finish.js";
+import { capOpacity } from "../internal/opacity.js";
+import { options } from "../internal/options.js";
+import { ownTransform } from "../internal/transform.js";
 import { revealTrigger } from "../internal/trigger.js";
-import type { RevealInit, Axis, RevealRegistration } from "../internal/types.js";
+import type { RevealInit, RevealRegistration } from "../internal/types.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
-export const init: RevealInit = (el, { reduced }) => {
-  if (reduced) {
-    gsap.set(el, { opacity: 1, rotationX: 0, rotationY: 0, rotation: 0 });
+export const init: RevealInit = (el, ctx) => {
+  if (ctx.reduced) {
+    unhide(el);
+    revealedAtOnce(el, ctx);
     return;
   }
 
-  const axis = (el.dataset.revealAxis ?? "x") as Axis;
-  const amount = num(el.dataset.revealRotate, 90);
-  const duration = num(el.dataset.revealDuration, 0.7);
-  const delay = num(el.dataset.revealDelay, 0);
+  const { axis, rotate: amount, duration, delay, ease } = options(el, ctx, {
+    axis: "x",
+    rotate: 90,
+    duration: 0.7,
+    delay: 0,
+    ease: "power3.out",
+  });
 
-  const fromVars: Record<string, number> = { opacity: 0, transformPerspective: 800 };
+  // Turn from the element's own angle plus `rotate`, back to its own angle,
+  // around its own transform-origin. SVG elements turn around their centre,
+  // as they did before 0.4: their default origin is the canvas corner.
+  const opacity = shownOpacity(el);
+  const own = ownTransform(el);
+  const fromVars: Record<string, number | string> = { opacity: 0, transformPerspective: 800 };
+  if (el instanceof SVGElement) fromVars.transformOrigin = "center";
   const toRotation: Record<string, number> = {};
   if (axis === "y") {
-    fromVars.rotationY = amount;
-    toRotation.rotationY = 0;
+    fromVars.rotationY = own.rotationY + amount;
+    toRotation.rotationY = own.rotationY;
   } else if (axis === "z") {
-    fromVars.rotation = amount;
-    toRotation.rotation = 0;
+    fromVars.rotation = own.rotation + amount;
+    toRotation.rotation = own.rotation;
   } else {
-    fromVars.rotationX = -amount;
-    toRotation.rotationX = 0;
+    fromVars.rotationX = own.rotationX - amount;
+    toRotation.rotationX = own.rotationX;
   }
 
-  gsap.set(el, { ...fromVars, transformOrigin: "center" });
+  gsap.set(el, fromVars);
 
+  markPending(el);
   const tween = gsap.to(el, {
-    opacity: 1,
+    opacity,
+    modifiers: capOpacity(opacity),
     ...toRotation,
     duration,
     delay,
-    ease: "power3.out",
-    scrollTrigger: revealTrigger(el),
+    ease,
+    scrollTrigger: revealTrigger(el, ctx),
+    ...revealCallbacks(el, ctx),
   });
 
   registry.track(el, tween);
+  printsAtEnd(el, ctx, () => tween);
 };
 
 export const rotate: RevealRegistration = { type: "rotate", init };

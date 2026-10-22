@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Two instances</title>
+</head>
+<body>
+  <p>Two instances on one page, as two separate scripts would create them: one registers fade, the other scale.</p>
+  <div class="gap"></div>
+  <div id="fade" class="box" data-reveal="fade" data-reveal-duration="0.2">fade, first instance</div>
+  <div class="gap"></div>
+  <div id="scale" class="box" data-reveal="scale" data-reveal-duration="0.2">scale, second instance</div>
+  <div class="gap"></div>
+  <section id="section">
+    <div id="section-fade" class="box" data-reveal="fade" data-reveal-duration="0.2">fade, first instance</div>
+    <div class="gap"></div>
+    <div id="section-scale" class="box" data-reveal="scale" data-reveal-duration="0.2">scale, second instance</div>
+  </section>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Defaults</title>
+</head>
+<body>
+  <p>Durations come from the options the test passes, or the attribute.</p>
+  <div id="fade" class="box" data-reveal="fade">fade, duration from defaults</div>
+  <div id="fade-attribute" class="box" data-reveal="fade" data-reveal-duration="0.4">fade, duration from its attribute</div>
+  <div id="scale" class="box" data-reveal="scale">scale, duration from typeDefaults</div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

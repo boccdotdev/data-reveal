@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Eases</title>
+</head>
+<body>
+  <!-- In view, so all three start together. -->
+  <div id="linear" class="box" data-reveal="fade" data-reveal-duration="2" data-reveal-ease="none">fade, ease none</div>
+  <div id="eased" class="box" data-reveal="fade" data-reveal-duration="2" data-reveal-ease="power4.in">fade, ease power4.in</div>
+  <div id="default" class="box" data-reveal="fade" data-reveal-duration="2">fade, ease from the defaults</div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

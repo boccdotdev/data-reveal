@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Batch groups</title>
+  <style>
+    /* The first two items start above the 85% line, the last two below it,
+       so they enter as two groups: at load, then after a short scroll. */
+    .above { height: 500px; }
+    ul { margin: 0; padding: 0; list-style: none; }
+    li { height: 52px; margin: 0 0 8px; background: #ddd; }
+    .muted { opacity: 0.6; }
+  </style>
+</head>
+<body>
+  <div class="above"></div>
+  <ul id="list" data-reveal="batch" data-reveal-duration="4" data-reveal-stagger="0">
+    <li data-reveal-item>one</li>
+    <li data-reveal-item class="muted">two</li>
+    <li data-reveal-item>three</li>
+    <li data-reveal-item class="muted">four</li>
+  </ul>
+  <div class="gap"></div>
+  <!-- The same list unrevealed, for where the items should end up. -->
+  <ul id="twin">
+    <li>one</li>
+    <li class="muted">two</li>
+    <li>three</li>
+    <li class="muted">four</li>
+  </ul>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

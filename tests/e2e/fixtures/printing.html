@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./head.js"></script>
+  <link rel="stylesheet" href="./fixture.css">
+  <title>Printing</title>
+  <style>
+    /* Each reveal sits next to a twin with the same CSS and no reveal. */
+    .pair { display: flex; gap: 40px; }
+    .stage { position: relative; width: 300px; height: 70px; }
+    .stage > * { width: 200px; margin: 0; padding: 0; list-style: none; }
+    .stage .box { box-sizing: border-box; height: 40px; }
+    .twin { visibility: hidden; }
+    /* Styles of the element's own that printing has to keep. */
+    .own { opacity: 0.6; translate: 20px 0; filter: grayscale(1); clip-path: inset(0 round 8px); }
+  </style>
+</head>
+<body>
+  <!-- In view: a reverse reveal that has played, and parallax. -->
+  <div class="pair">
+    <div class="stage"><div id="reverse-shown" class="box own" data-reveal="fade" data-reveal-reverse data-reveal-duration="0.2">fade, reverse</div></div>
+    <div class="stage"><div id="reverse-shown-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="parallax" class="box own" data-reveal="parallax">parallax</div></div>
+    <div class="stage"><div id="parallax-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="gap"></div>
+  <!-- Below the fold: every type still waiting. -->
+  <div class="pair">
+    <div class="stage"><div id="fade" class="box own" data-reveal="fade">fade</div></div>
+    <div class="stage"><div id="fade-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="scale" class="box own" data-reveal="scale">scale</div></div>
+    <div class="stage"><div id="scale-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="blur" class="box own" data-reveal="blur">blur</div></div>
+    <div class="stage"><div id="blur-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="clip" class="box own" data-reveal="clip">clip</div></div>
+    <div class="stage"><div id="clip-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="rotate" class="box own" data-reveal="rotate">rotate</div></div>
+    <div class="stage"><div id="rotate-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="slide" class="box own" data-reveal="slide">slide</div></div>
+    <div class="stage"><div id="slide-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><p id="split" class="own" data-reveal="split">Split text</p></div>
+    <div class="stage"><p id="split-twin" class="own twin">Split text</p></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul id="batch" data-reveal="batch"><li id="batch-item" class="box own" data-reveal-item>batch item</li></ul></div>
+    <div class="stage"><ul><li id="batch-item-twin" class="box own twin">twin</li></ul></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="counter" class="box" data-reveal="counter" data-reveal-to="1200">0</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="reverse" class="box own" data-reveal="fade" data-reveal-reverse>fade, reverse</div></div>
+    <div class="stage"><div id="reverse-twin" class="box own twin">twin</div></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul id="reverse-batch" data-reveal="batch" data-reveal-reverse><li id="reverse-item" class="box own" data-reveal-item>batch item, reverse</li></ul></div>
+    <div class="stage"><ul><li id="reverse-item-twin" class="box own twin">twin</li></ul></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul id="split-batch" data-reveal="batch"><li><p id="split-item" class="own" data-reveal="split" data-reveal-item>Split batch item</p></li></ul></div>
+    <div class="stage"><ul><li><p id="split-item-twin" class="own twin">Split batch item</p></li></ul></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><ul id="marked-batch" data-reveal="batch"><p id="heading-split" class="own" data-reveal="split">Heading, not an item</p><li data-reveal-item class="box">item</li></ul></div>
+    <div class="stage"><ul><p id="heading-split-twin" class="own twin">Heading, not an item</p></ul></div>
+  </div>
+  <div class="pair">
+    <div class="stage"><div id="fallback-batch" data-reveal="batch"><p id="child-split" class="own" data-reveal="split">Split child</p></div></div>
+  </div>
+  <div class="gap"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>
